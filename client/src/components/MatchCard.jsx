@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { hexToRgba } from '../lib/colors.js';
+import { computeOdds, formatMoneyline } from '../lib/odds.js';
 
 const FORMAT_LABEL = {
   best_ball: 'Best Ball',
@@ -56,23 +57,53 @@ export default function MatchCard({ match, teams }) {
         )}
       </div>
 
-      <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center mt-3">
-        <PlayerSide team={a} players={match.sideA} dim={isFinal && c?.lead < 0} />
-        <ScoreCenter match={match} teams={teams} />
-        <PlayerSide
-          team={b}
-          players={match.sideB}
-          alignRight
-          dim={isFinal && c?.lead > 0}
-        />
-      </div>
+      {(() => {
+        const odds = inProgress ? computeOdds(match) : null;
+        const aLabel = odds ? `(${formatMoneyline(odds.moneyA)})` : null;
+        const bLabel = odds ? `(${formatMoneyline(odds.moneyB)})` : null;
+        return (
+          <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center mt-3">
+            <PlayerSide
+              team={a}
+              players={match.sideA}
+              odds={aLabel}
+              dim={isFinal && c?.lead < 0}
+            />
+            <ScoreCenter match={match} teams={teams} />
+            <PlayerSide
+              team={b}
+              players={match.sideB}
+              odds={bLabel}
+              alignRight
+              dim={isFinal && c?.lead > 0}
+            />
+          </div>
+        );
+      })()}
 
       <HoleStrip match={match} teamA={a} teamB={b} />
     </Link>
   );
 }
 
-function PlayerSide({ team, players, alignRight, dim }) {
+function PlayerSide({ team, players, alignRight, dim, odds }) {
+  const namesNode =
+    players.length === 0 ? (
+      <span className="text-ink/40 text-sm italic">tbd</span>
+    ) : (
+      <span
+        className={`text-sm font-medium leading-tight ${dim ? 'text-ink/40' : 'text-ink'}`}
+      >
+        {players.map((p) => p.name).join(' / ')}
+      </span>
+    );
+
+  const oddsNode = odds ? (
+    <span className="text-[11px] tabular-nums font-semibold text-ink/55 leading-none">
+      {odds}
+    </span>
+  ) : null;
+
   return (
     <div className={`min-w-0 ${alignRight ? 'text-right' : ''}`}>
       <div
@@ -81,15 +112,21 @@ function PlayerSide({ team, players, alignRight, dim }) {
       >
         {team.name}
       </div>
-      {players.length === 0 ? (
-        <div className="text-ink/40 text-sm italic">tbd</div>
-      ) : (
-        <div
-          className={`text-sm font-medium leading-tight ${dim ? 'text-ink/40' : 'text-ink'}`}
-        >
-          {players.map((p) => p.name).join(' / ')}
-        </div>
-      )}
+      <div
+        className={`flex items-baseline gap-1.5 flex-wrap ${alignRight ? 'justify-end' : ''}`}
+      >
+        {alignRight ? (
+          <>
+            {oddsNode}
+            {namesNode}
+          </>
+        ) : (
+          <>
+            {namesNode}
+            {oddsNode}
+          </>
+        )}
+      </div>
     </div>
   );
 }
