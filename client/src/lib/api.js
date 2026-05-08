@@ -35,9 +35,11 @@ export const api = {
   setHandicap: (playerId, handicap) =>
     request('PATCH', `/player/${playerId}/handicap`, { handicap }),
 
-  placeBet: (name, matchId, pick) =>
-    request('POST', '/bet', { name, matchId, pick }),
-  cancelBet: (name, matchId) => request('DELETE', '/bet', { name, matchId }),
+  authBettor: (name, code) => request('POST', '/bet/auth', { name, code }),
+  placeBet: (name, code, matchId, pick) =>
+    request('POST', '/bet', { name, code, matchId, pick }),
+  cancelBet: (name, code, matchId) =>
+    request('DELETE', '/bet', { name, code, matchId }),
 };
 
 export const COURSE_PARS = [5, 4, 5, 3, 4, 4, 4, 4, 3];

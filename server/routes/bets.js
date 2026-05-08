@@ -8,27 +8,69 @@ const router = Router();
 
 const VALID_PICKS = new Set(['A', 'B', 'halve']);
 
-function findOrCreateBettor(name) {
-  const trimmed = String(name || '').trim();
-  if (!trimmed) return null;
-  if (trimmed.length > 30) return null;
-  const existing = db
-    .prepare('SELECT id, name FROM bettor WHERE LOWER(name) = LOWER(?)')
-    .get(trimmed);
-  if (existing) return existing;
-  const r = db.prepare('INSERT INTO bettor (name) VALUES (?)').run(trimmed);
-  return { id: r.lastInsertRowid, name: trimmed };
+function normalizeName(name) {
+  const t = String(name || '').trim();
+  if (!t) return null;
+  if (t.length > 30) return null;
+  return t;
 }
 
+function normalizeCode(code) {
+  const t = String(code || '').trim();
+  if (!t) return null;
+  if (t.length < 3 || t.length > 30) return null;
+  return t;
+}
+
+function findBettor(name) {
+  return db
+    .prepare('SELECT id, name, code FROM bettor WHERE LOWER(name) = LOWER(?)')
+    .get(name);
+}
+
+// Returns { bettor, claimed, error }
+//   - error: 'wrong_code' (existing bettor, code doesn't match)
+//   - claimed: true means we just set the code on a previously code-less bettor
+function authBettor(rawName, rawCode) {
+  const name = normalizeName(rawName);
+  const code = normalizeCode(rawCode);
+  if (!name) return { error: 'name required (max 30 chars)' };
+  if (!code) return { error: 'code required (3–30 chars)' };
+
+  const existing = findBettor(name);
+  if (existing) {
+    if (!existing.code) {
+      db.prepare('UPDATE bettor SET code = ? WHERE id = ?').run(code, existing.id);
+      return { bettor: { ...existing, code }, claimed: true, isNew: false };
+    }
+    if (existing.code !== code) return { error: 'wrong_code' };
+    return { bettor: existing, claimed: false, isNew: false };
+  }
+
+  const r = db.prepare('INSERT INTO bettor (name, code) VALUES (?, ?)').run(name, code);
+  return {
+    bettor: { id: r.lastInsertRowid, name, code },
+    claimed: false,
+    isNew: true,
+  };
+}
+
+router.post('/auth', (req, res) => {
+  const { name, code } = req.body || {};
+  const r = authBettor(name, code);
+  if (r.error === 'wrong_code') return res.status(401).json({ error: 'wrong code for that name' });
+  if (r.error) return res.status(400).json({ error: r.error });
+  res.json({ ok: true, bettor: { id: r.bettor.id, name: r.bettor.name }, isNew: r.isNew, claimed: !!r.claimed });
+});
+
 router.post('/', (req, res) => {
-  const { name, matchId, pick } = req.body || {};
+  const { name, code, matchId, pick } = req.body || {};
   if (!Number.isInteger(matchId)) return res.status(400).json({ error: 'matchId required' });
   if (!VALID_PICKS.has(pick)) return res.status(400).json({ error: 'pick must be A, B, or halve' });
 
-  const trimmedName = String(name || '').trim();
-  if (!trimmedName || trimmedName.length > 30) {
-    return res.status(400).json({ error: 'name required (max 30 chars)' });
-  }
+  const auth = authBettor(name, code);
+  if (auth.error === 'wrong_code') return res.status(401).json({ error: 'wrong code for that name' });
+  if (auth.error) return res.status(400).json({ error: auth.error });
 
   const match = matchSnapshot(matchId);
   if (!match) return res.status(404).json({ error: 'match not found' });
@@ -42,12 +84,10 @@ router.post('/', (req, res) => {
   const odds = computeOdds(match, { preMatch: true });
   if (!odds) return res.status(409).json({ error: 'odds unavailable' });
 
-  const bettor = findOrCreateBettor(trimmedName);
-  if (!bettor) return res.status(400).json({ error: 'name required (max 30 chars)' });
-
+  const bettorId = auth.bettor.id;
   const existing = db
     .prepare('SELECT id FROM bet WHERE bettor_id = ? AND match_id = ?')
-    .get(bettor.id, matchId);
+    .get(bettorId, matchId);
 
   if (existing) {
     db.prepare(
@@ -59,21 +99,20 @@ router.post('/', (req, res) => {
     db.prepare(
       `INSERT INTO bet (bettor_id, match_id, pick, money_a, money_b, money_halve)
        VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(bettor.id, matchId, pick, odds.moneyA, odds.moneyB, odds.moneyHalve);
+    ).run(bettorId, matchId, pick, odds.moneyA, odds.moneyB, odds.moneyHalve);
   }
 
   broadcast('state', getFullState());
-  res.json({ ok: true, bettor });
+  res.json({ ok: true });
 });
 
 router.delete('/', (req, res) => {
-  const { name, matchId } = req.body || {};
+  const { name, code, matchId } = req.body || {};
   if (!Number.isInteger(matchId)) return res.status(400).json({ error: 'matchId required' });
-  const trimmed = String(name || '').trim();
-  if (!trimmed) return res.status(400).json({ error: 'name required' });
 
-  const bettor = db.prepare('SELECT id FROM bettor WHERE LOWER(name) = LOWER(?)').get(trimmed);
-  if (!bettor) return res.status(404).json({ error: 'bettor not found' });
+  const auth = authBettor(name, code);
+  if (auth.error === 'wrong_code') return res.status(401).json({ error: 'wrong code for that name' });
+  if (auth.error) return res.status(400).json({ error: auth.error });
 
   const match = db.prepare('SELECT status FROM match WHERE id = ?').get(matchId);
   if (!match) return res.status(404).json({ error: 'match not found' });
@@ -81,7 +120,10 @@ router.delete('/', (req, res) => {
     return res.status(409).json({ error: 'bets locked — match has started' });
   }
 
-  db.prepare('DELETE FROM bet WHERE bettor_id = ? AND match_id = ?').run(bettor.id, matchId);
+  db.prepare('DELETE FROM bet WHERE bettor_id = ? AND match_id = ?').run(
+    auth.bettor.id,
+    matchId
+  );
   broadcast('state', getFullState());
   res.json({ ok: true });
 });

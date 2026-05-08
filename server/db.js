@@ -18,6 +18,7 @@ const schema = fs.readFileSync(schemaPath, 'utf8');
 db.exec(schema);
 
 ensureColumn('player', 'handicap', 'REAL NOT NULL DEFAULT 0');
+ensureColumn('bettor', 'code', 'TEXT');
 
 // SQLite ALTER TABLE ADD COLUMN can't take an expression default, so add the
 // column without one, then backfill existing rows.

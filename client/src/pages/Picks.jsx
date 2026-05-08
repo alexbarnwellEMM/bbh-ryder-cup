@@ -12,60 +12,136 @@ const FORMAT_LABEL = {
 
 export default function Picks({ state }) {
   const [name, setName] = useState(() => localStorage.getItem('bbh_bettor') || '');
-  const [draft, setDraft] = useState(name);
-  const [editing, setEditing] = useState(!name);
+  const [code, setCode] = useState(() => localStorage.getItem('bbh_bettor_code') || '');
+  const [editing, setEditing] = useState(!name || !code);
 
-  function save() {
-    const next = draft.trim().slice(0, 30);
-    if (!next) return;
-    setName(next);
-    localStorage.setItem('bbh_bettor', next);
+  function logout() {
+    localStorage.removeItem('bbh_bettor');
+    localStorage.removeItem('bbh_bettor_code');
+    setName('');
+    setCode('');
+    setEditing(true);
+  }
+
+  function onLogin(nextName, nextCode) {
+    localStorage.setItem('bbh_bettor', nextName);
+    localStorage.setItem('bbh_bettor_code', nextCode);
+    setName(nextName);
+    setCode(nextCode);
     setEditing(false);
   }
 
-  if (!name || editing) {
+  if (!name || !code || editing) {
     return (
-      <div className="space-y-4">
-        <div className="card p-5 max-w-sm mx-auto space-y-3">
-          <div className="text-center">
-            <div className="ribbon">Spectator picks</div>
-            <h2 className="font-display font-bold text-xl mt-1">
-              {name ? 'Change your name' : "Enter your name"}
-            </h2>
-            <p className="text-sm text-ink/60 mt-1">
-              Pick winners on every match. Odds use handicaps + format.
-              Win at +180, lose 100. No real money — just bragging rights.
-            </p>
-          </div>
-          <input
-            autoFocus
-            className="input w-full text-center text-lg"
-            placeholder="Your name"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && save()}
-            maxLength={30}
-          />
-          <button className="btn btn-primary w-full" onClick={save} disabled={!draft.trim()}>
-            {name ? 'Update name' : "Let's go"}
-          </button>
-          {name && (
-            <button className="btn w-full" onClick={() => setEditing(false)}>
-              Cancel
-            </button>
-          )}
-        </div>
-        {!editing && <Leaderboard bettors={state.bets || []} highlight={name} />}
-      </div>
+      <Login
+        bettors={state.bets || []}
+        existingName={name}
+        onLogin={onLogin}
+        onCancel={name && code ? () => setEditing(false) : null}
+      />
     );
   }
 
-  return <PicksInner state={state} name={name} onChangeName={() => setEditing(true)} />;
+  return (
+    <PicksInner
+      state={state}
+      name={name}
+      code={code}
+      onSwitch={() => setEditing(true)}
+      onLogout={logout}
+    />
+  );
 }
 
-function PicksInner({ state, name, onChangeName }) {
+function Login({ bettors, existingName, onLogin, onCancel }) {
+  const [draftName, setDraftName] = useState(existingName || '');
+  const [draftCode, setDraftCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [hint, setHint] = useState('');
+
+  async function submit() {
+    setErr('');
+    setHint('');
+    const n = draftName.trim().slice(0, 30);
+    const c = draftCode.trim();
+    if (!n) return setErr('name required');
+    if (c.length < 3) return setErr('code must be 3+ characters');
+    setBusy(true);
+    try {
+      const r = await api.authBettor(n, c);
+      if (r?.isNew) setHint('account created');
+      onLogin(n, c);
+    } catch (e) {
+      setErr(e.message || 'failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="card p-5 max-w-sm mx-auto space-y-3">
+        <div className="text-center">
+          <div className="ribbon">Spectator picks</div>
+          <h2 className="font-display font-bold text-xl mt-1">
+            {existingName ? 'Sign in' : 'Create your bettor'}
+          </h2>
+          <p className="text-sm text-ink/65 mt-1">
+            Pick a name + a personal code. The code locks your picks so nobody
+            else can place bets under your name. Win at +ML, lose 100. Bragging rights only.
+          </p>
+        </div>
+        <input
+          autoFocus
+          className="input w-full text-center text-lg"
+          placeholder="Your name"
+          value={draftName}
+          onChange={(e) => setDraftName(e.target.value)}
+          maxLength={30}
+        />
+        <input
+          className="input w-full text-center text-lg tracking-widest"
+          type="password"
+          placeholder="Your code (3+ chars)"
+          value={draftCode}
+          onChange={(e) => setDraftCode(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && submit()}
+          maxLength={30}
+        />
+        {err && (
+          <div className="text-flag text-sm text-center">
+            {err === 'wrong code for that name' ? (
+              <>That name is taken. Use a different name, or enter the matching code.</>
+            ) : (
+              err
+            )}
+          </div>
+        )}
+        {hint && <div className="text-fairway text-sm text-center">{hint}</div>}
+        <button
+          className="btn btn-primary w-full"
+          onClick={submit}
+          disabled={busy || !draftName.trim() || draftCode.trim().length < 3}
+        >
+          {existingName ? 'Sign in' : "Let's go"}
+        </button>
+        {onCancel && (
+          <button className="btn w-full" onClick={onCancel}>
+            Cancel
+          </button>
+        )}
+      </div>
+      <Leaderboard bettors={bettors} highlight={existingName} />
+    </div>
+  );
+}
+
+function PicksInner({ state, name, code, onSwitch, onLogout }) {
   const myBets = useMemo(() => {
-    const me = (state.bets || []).find((b) => b.name.toLowerCase() === name.toLowerCase());
+    const me = (state.bets || []).find(
+      (b) => b.name.toLowerCase() === name.toLowerCase()
+    );
     if (!me) return new Map();
     return new Map(me.bets.map((b) => [b.matchId, b]));
   }, [state.bets, name]);
@@ -79,9 +155,10 @@ function PicksInner({ state, name, onChangeName }) {
           </div>
           <div className="text-base font-display font-bold">{name}</div>
         </div>
-        <button className="btn" onClick={onChangeName}>
-          Change
-        </button>
+        <div className="flex gap-1.5">
+          <button className="btn" onClick={onSwitch}>Switch</button>
+          <button className="btn" onClick={onLogout}>Sign out</button>
+        </div>
       </div>
 
       <Leaderboard bettors={state.bets || []} highlight={name} />
@@ -99,6 +176,7 @@ function PicksInner({ state, name, onChangeName }) {
                 match={m}
                 teams={state.teams}
                 name={name}
+                code={code}
                 myBet={myBets.get(m.id)}
               />
             ))}
@@ -109,7 +187,7 @@ function PicksInner({ state, name, onChangeName }) {
   );
 }
 
-function BetRow({ match, teams, name, myBet }) {
+function BetRow({ match, teams, name, code, myBet }) {
   const [a, b] = teams;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -118,17 +196,10 @@ function BetRow({ match, teams, name, myBet }) {
   const isFinal = match.status === 'final';
   const lineupReady = match.sideA.length > 0 && match.sideB.length > 0;
 
-  const moneyA = myBet?.moneyA ?? null;
-  const moneyB = myBet?.moneyB ?? null;
-  const moneyHalve = myBet?.moneyHalve ?? null;
-
-  // For matches without a stored bet, derive odds from the match's pre-match
-  // computation on the fly. computeOdds is only safe with sideA/sideB present.
   const previewOdds = useMemo(() => {
     if (!isPending || !lineupReady) return null;
     if (myBet) return null;
-    const fakeMatch = { ...match };
-    return previewMoneyline(fakeMatch);
+    return computeOdds(match, { preMatch: true });
   }, [match, isPending, lineupReady, myBet]);
 
   async function place(pick) {
@@ -136,7 +207,7 @@ function BetRow({ match, teams, name, myBet }) {
     setErr('');
     setBusy(true);
     try {
-      await api.placeBet(name, match.id, pick);
+      await api.placeBet(name, code, match.id, pick);
     } catch (e) {
       setErr(e.message || 'failed');
     } finally {
@@ -149,16 +220,13 @@ function BetRow({ match, teams, name, myBet }) {
     setErr('');
     setBusy(true);
     try {
-      await api.cancelBet(name, match.id);
+      await api.cancelBet(name, code, match.id);
     } catch (e) {
       setErr(e.message || 'failed');
     } finally {
       setBusy(false);
     }
   }
-
-  const aLabel = `${a.name} · ${match.sideA.map((p) => p.name).join(' / ') || 'tbd'}`;
-  const bLabel = `${b.name} · ${match.sideB.map((p) => p.name).join(' / ') || 'tbd'}`;
 
   return (
     <div className="card p-3 space-y-2">
@@ -176,7 +244,7 @@ function BetRow({ match, teams, name, myBet }) {
       <div className="grid grid-cols-3 gap-1.5">
         <PickButton
           team={a}
-          label={`${a.name}`}
+          label={a.name}
           subLabel={match.sideA.map((p) => p.name).join(' / ')}
           ml={myBet?.moneyA ?? previewOdds?.moneyA}
           selected={myBet?.pick === 'A'}
@@ -191,14 +259,14 @@ function BetRow({ match, teams, name, myBet }) {
           subLabel="match tied"
           ml={myBet?.moneyHalve ?? previewOdds?.moneyHalve}
           selected={myBet?.pick === 'halve'}
-          winner={isFinal && match.computed?.lead === 0 && match.status === 'final'}
+          winner={isFinal && match.computed?.lead === 0}
           loser={isFinal && match.computed?.lead !== 0}
           disabled={!isPending || busy}
           onClick={() => place('halve')}
         />
         <PickButton
           team={b}
-          label={`${b.name}`}
+          label={b.name}
           subLabel={match.sideB.map((p) => p.name).join(' / ')}
           ml={myBet?.moneyB ?? previewOdds?.moneyB}
           selected={myBet?.pick === 'B'}
@@ -219,10 +287,19 @@ function BetRow({ match, teams, name, myBet }) {
         <div className="flex items-center justify-between text-[11px]">
           <div className="text-ink/70">
             {myBet.outcome === 'pending' && (
-              <>You picked <span className="font-semibold">{labelFor(myBet.pick, a, b)}</span> — risking 100 to win {Math.max(0, payoutOf(myBet.moneyOnPick))}.</>
+              <>
+                You picked{' '}
+                <span className="font-semibold">
+                  {labelFor(myBet.pick, a, b)}
+                </span>{' '}
+                — risking 100 to win {Math.max(0, payoutOf(myBet.moneyOnPick))}.
+              </>
             )}
             {myBet.outcome === 'win' && (
-              <span className="text-fairway font-semibold">Won {myBet.payout > 0 ? '+' : ''}{myBet.payout}</span>
+              <span className="text-fairway font-semibold">
+                Won {myBet.payout > 0 ? '+' : ''}
+                {myBet.payout}
+              </span>
             )}
             {myBet.outcome === 'loss' && (
               <span className="text-flag font-semibold">Lost {myBet.payout}</span>
@@ -285,7 +362,10 @@ function PickButton({
       {subLabel && (
         <div className="text-[10px] text-ink/55 truncate">{subLabel}</div>
       )}
-      <div className="text-sm font-bold tabular-nums mt-0.5" style={{ color: color || '#2f5a3d' }}>
+      <div
+        className="text-sm font-bold tabular-nums mt-0.5"
+        style={{ color: color || '#2f5a3d' }}
+      >
         ML {formatMoneyline(ml)}
       </div>
     </button>
@@ -353,8 +433,4 @@ function payoutOf(ml) {
   if (ml == null) return 0;
   if (ml > 0) return ml;
   return Math.round((100 / Math.abs(ml)) * 100);
-}
-
-function previewMoneyline(match) {
-  return computeOdds(match, { preMatch: true });
 }

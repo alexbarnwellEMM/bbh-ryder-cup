@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS hole_player_score (
 CREATE TABLE IF NOT EXISTS bettor (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
+  code TEXT,
   created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
 );
 
