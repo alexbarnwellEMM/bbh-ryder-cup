@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS hole_result (
   team_a_score INTEGER,
   team_b_score INTEGER,
   winner TEXT,
+  created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
   UNIQUE(match_id, hole_index)
 );
 
@@ -63,6 +64,24 @@ CREATE TABLE IF NOT EXISTS hole_player_score (
   player_id INTEGER NOT NULL REFERENCES player(id),
   score INTEGER,
   UNIQUE(hole_result_id, player_id)
+);
+
+CREATE TABLE IF NOT EXISTS bettor (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
+
+CREATE TABLE IF NOT EXISTS bet (
+  id INTEGER PRIMARY KEY,
+  bettor_id INTEGER NOT NULL REFERENCES bettor(id),
+  match_id INTEGER NOT NULL REFERENCES match(id),
+  pick TEXT NOT NULL,
+  money_a INTEGER,
+  money_b INTEGER,
+  money_halve INTEGER,
+  created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+  UNIQUE(bettor_id, match_id)
 );
 
 CREATE TABLE IF NOT EXISTS tiebreaker (

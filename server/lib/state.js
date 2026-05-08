@@ -1,6 +1,7 @@
 import { db } from '../db.js';
 import { computeMatch, pointsFor } from './matchPlay.js';
 import { holeOrderFromStart, SWEETENS_COVE } from './course.js';
+import { payoutFor } from './odds.js';
 
 export function recomputeMatch(matchId) {
   const match = db.prepare('SELECT * FROM match WHERE id = ?').get(matchId);
@@ -141,6 +142,7 @@ export function getFullState() {
           teamBScore: h.team_b_score,
           winner: h.winner,
           playerScores: ps,
+          createdAt: h.created_at,
         };
       }),
       holePlayOrder,
@@ -211,6 +213,9 @@ export function getFullState() {
     else if (tiebreaker?.winner && tiebreaker.winner !== 'tie') tournamentFinal = true;
   }
 
+  const bets = buildBets(matchOut);
+  const activity = buildActivity(matchOut);
+
   return {
     tournament: {
       id: tournament.id,
@@ -225,5 +230,120 @@ export function getFullState() {
     tieAfterAll,
     tournamentFinal,
     course: SWEETENS_COVE,
+    bets,
+    activity,
   };
+}
+
+function buildBets(matchOut) {
+  const bettors = db.prepare('SELECT * FROM bettor ORDER BY id').all();
+  const allBets = db.prepare('SELECT * FROM bet ORDER BY created_at').all();
+  const matchById = new Map(matchOut.map((m) => [m.id, m]));
+
+  const bettorRows = bettors.map((b) => {
+    const myBets = allBets
+      .filter((bt) => bt.bettor_id === b.id)
+      .map((bt) => decorateBet(bt, matchById.get(bt.match_id)));
+    const points = myBets.reduce((s, x) => s + (x.payout || 0), 0);
+    const settled = myBets.filter((x) => x.outcome !== 'pending').length;
+    const wins = myBets.filter((x) => x.outcome === 'win').length;
+    return {
+      id: b.id,
+      name: b.name,
+      bets: myBets,
+      points,
+      settled,
+      wins,
+      open: myBets.length - settled,
+    };
+  });
+
+  const populated = bettorRows.filter((r) => r.bets.length > 0);
+  populated.sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
+  return populated;
+}
+
+function decorateBet(bet, match) {
+  const moneyByPick = {
+    A: bet.money_a,
+    B: bet.money_b,
+    halve: bet.money_halve,
+  };
+  const pickedMoney = moneyByPick[bet.pick];
+
+  let outcome = 'pending';
+  let payout = 0;
+
+  if (match && match.status === 'final') {
+    const c = match.computed;
+    const actual = c.lead > 0 ? 'A' : c.lead < 0 ? 'B' : 'halve';
+    if (actual === bet.pick) {
+      outcome = 'win';
+      payout = payoutFor(pickedMoney);
+    } else {
+      outcome = 'loss';
+      payout = -100;
+    }
+  }
+
+  return {
+    id: bet.id,
+    bettorId: bet.bettor_id,
+    matchId: bet.match_id,
+    pick: bet.pick,
+    moneyA: bet.money_a,
+    moneyB: bet.money_b,
+    moneyHalve: bet.money_halve,
+    moneyOnPick: pickedMoney,
+    outcome,
+    payout,
+    locked: match ? match.status !== 'pending' : true,
+    createdAt: bet.created_at,
+  };
+}
+
+function buildActivity(matchOut) {
+  const events = [];
+  for (const m of matchOut) {
+    const sortedHoles = [...m.holes].sort((a, b) => a.holeIndex - b.holeIndex);
+    let aWins = 0;
+    let bWins = 0;
+    let holesPlayed = 0;
+
+    for (const h of sortedHoles) {
+      holesPlayed++;
+      if (h.winner === 'A') aWins++;
+      else if (h.winner === 'B') bWins++;
+
+      const lead = aWins - bWins;
+      const absLead = Math.abs(lead);
+      const remaining = 9 - holesPlayed;
+      const closing = absLead > remaining;
+
+      events.push({
+        type: closing ? 'match_close' : 'hole',
+        matchId: m.id,
+        matchFormat: m.format,
+        holeNumber: h.holeNumber,
+        holeIndex: h.holeIndex,
+        winner: h.winner,
+        teamAScore: h.teamAScore,
+        teamBScore: h.teamBScore,
+        leadAfter: lead,
+        sideA: m.sideA.map((p) => p.name),
+        sideB: m.sideB.map((p) => p.name),
+        result: closing ? m.result : null,
+        createdAt: h.createdAt,
+      });
+
+      if (closing) break;
+    }
+  }
+  events.sort((a, b) => {
+    const ta = a.createdAt || 0;
+    const tb = b.createdAt || 0;
+    if (ta !== tb) return tb - ta;
+    return b.matchId - a.matchId;
+  });
+  return events.slice(0, 50);
 }

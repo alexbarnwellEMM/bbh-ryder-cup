@@ -8,6 +8,7 @@ import Scoreboard from './pages/Scoreboard.jsx';
 import Setup from './pages/Setup.jsx';
 import Scorekeeper from './pages/Scorekeeper.jsx';
 import Players from './pages/Players.jsx';
+import Picks from './pages/Picks.jsx';
 import Tiebreaker from './pages/Tiebreaker.jsx';
 import Final from './pages/Final.jsx';
 
@@ -63,6 +64,7 @@ export default function App() {
           <Tab to="/setup">Setup</Tab>
           <Tab to="/score">Scorekeeper</Tab>
           <Tab to="/players">Records</Tab>
+          <Tab to="/picks">Picks</Tab>
           {(state.tieAfterAll || state.tiebreaker?.active) && <Tab to="/tiebreaker">Tiebreaker</Tab>}
           {state.tournamentFinal && <Tab to="/final">Final</Tab>}
         </nav>
@@ -96,6 +98,7 @@ export default function App() {
             }
           />
           <Route path="/players" element={<Players state={state} />} />
+          <Route path="/picks" element={<Picks state={state} />} />
           <Route
             path="/tiebreaker"
             element={

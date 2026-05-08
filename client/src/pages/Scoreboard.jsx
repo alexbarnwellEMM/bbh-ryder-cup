@@ -1,8 +1,9 @@
 import TeamScore from '../components/TeamScore.jsx';
 import MatchCard from '../components/MatchCard.jsx';
+import ActivityTicker from '../components/ActivityTicker.jsx';
 
 export default function Scoreboard({ state }) {
-  const { teams, sessions, totals, tournamentFinal, tieAfterAll, tiebreaker } = state;
+  const { teams, sessions, totals, tournamentFinal, tieAfterAll, tiebreaker, activity } = state;
 
   return (
     <div className="space-y-5">
@@ -12,6 +13,8 @@ export default function Scoreboard({ state }) {
         matches={state.matches}
         tournamentFinal={tournamentFinal}
       />
+
+      <ActivityTicker activity={activity} teams={teams} />
 
       {tieAfterAll && !tiebreaker?.winner && (
         <div className="card p-3 border-flag/40 bg-flag/5">

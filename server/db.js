@@ -19,9 +19,24 @@ db.exec(schema);
 
 ensureColumn('player', 'handicap', 'REAL NOT NULL DEFAULT 0');
 
+// SQLite ALTER TABLE ADD COLUMN can't take an expression default, so add the
+// column without one, then backfill existing rows.
+if (!hasColumn('hole_result', 'created_at')) {
+  db.exec(`ALTER TABLE hole_result ADD COLUMN created_at INTEGER`);
+  db.exec(
+    `UPDATE hole_result SET created_at = strftime('%s','now') WHERE created_at IS NULL`
+  );
+}
+
+function hasColumn(table, column) {
+  return db
+    .prepare(`PRAGMA table_info(${table})`)
+    .all()
+    .some((c) => c.name === column);
+}
+
 function ensureColumn(table, column, defn) {
-  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
-  if (!cols.find((c) => c.name === column)) {
+  if (!hasColumn(table, column)) {
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${defn}`);
   }
 }

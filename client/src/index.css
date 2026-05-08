@@ -66,3 +66,21 @@ h1, h2, h3, .font-display {
   50% { box-shadow: 0 0 0 10px transparent; }
 }
 .lead-pulse { animation: leadPulse 2.4s ease-in-out infinite; }
+
+@keyframes tickerScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.ticker-mask {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent);
+          mask-image: linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent);
+}
+.ticker-track {
+  display: flex;
+  gap: 0.6rem;
+  width: max-content;
+  padding: 0.5rem 0.75rem;
+  animation: tickerScroll 60s linear infinite;
+}
+.ticker-track:hover { animation-play-state: paused; }
