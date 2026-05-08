@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body {
+  -webkit-tap-highlight-color: transparent;
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-feature-settings: "tnum" 1, "ss01" 1;
+  background-image:
+    radial-gradient(ellipse at 10% -10%, rgba(201,181,116,0.18), transparent 55%),
+    radial-gradient(ellipse at 110% 110%, rgba(47,90,61,0.10), transparent 55%);
+  background-attachment: fixed;
+}
+
+h1, h2, h3, .font-display {
+  font-family: 'Bitter', Georgia, ui-serif, serif;
+  letter-spacing: -0.01em;
+}
+
+@layer components {
+  .pill {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide;
+  }
+  .pill-muted {
+    @apply pill bg-cream-dark text-ink/70 border border-bunker/60;
+  }
+  .pill-fairway {
+    @apply pill bg-fairway/10 text-fairway border border-fairway/30;
+  }
+  .card {
+    @apply bg-white/95 border border-bunker/70 rounded-2xl;
+    box-shadow: 0 1px 0 rgba(44, 36, 24, 0.04), 0 8px 22px -16px rgba(44, 36, 24, 0.18);
+  }
+  .card-soft {
+    @apply bg-cream-dark/40 border border-bunker/50 rounded-2xl;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center px-3.5 py-2 rounded-full font-medium text-sm border border-bunker bg-white text-ink hover:bg-cream-dark active:scale-[0.98] transition;
+    box-shadow: 0 1px 0 rgba(44,36,24,0.04);
+  }
+  .btn-primary {
+    @apply bg-fairway border-fairway text-white hover:bg-fairway-light;
+  }
+  .btn-flag {
+    @apply bg-flag border-flag text-white hover:opacity-90;
+  }
+  .input {
+    @apply bg-white border border-bunker rounded-xl px-3 py-2 text-base outline-none focus:border-fairway focus:ring-2 focus:ring-fairway/20 text-ink;
+  }
+  .divider {
+    height: 1px;
+    background: repeating-linear-gradient(
+      to right,
+      rgba(44,36,24,0.18) 0 6px,
+      transparent 6px 12px
+    );
+  }
+  .ribbon {
+    @apply text-[10px] uppercase tracking-[0.3em] text-fairway font-semibold;
+  }
+}
+
+@keyframes leadPulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--ring, transparent); }
+  50% { box-shadow: 0 0 0 10px transparent; }
+}
+.lead-pulse { animation: leadPulse 2.4s ease-in-out infinite; }
