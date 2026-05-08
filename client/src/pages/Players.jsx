@@ -32,7 +32,7 @@ function TeamStandings({ team, rows }) {
             {team.name}
           </span>
           <span className="text-[10px] uppercase tracking-widest text-ink/45 font-semibold">
-            standings
+            performance
           </span>
         </div>
         <div className="text-[10px] uppercase tracking-widest text-ink/45 font-semibold">
