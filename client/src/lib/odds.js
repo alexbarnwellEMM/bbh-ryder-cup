@@ -1,19 +1,25 @@
-export function computeOdds(match) {
+export function computeOdds(match, { preMatch = false } = {}) {
+  if (!match) return null;
+  if (!match.sideA?.length || !match.sideB?.length) return null;
+
   const c = match.computed;
-  if (!c) return null;
-  if (match.status !== 'in_progress') return null;
-  if (c.isClosed) return null;
 
-  const remaining = c.remaining;
-  if (remaining <= 0) return null;
+  let lead;
+  let remaining;
+  let momentum;
 
-  const recent = [...(match.holes || [])]
-    .sort((a, b) => b.holeIndex - a.holeIndex)
-    .slice(0, 3);
-  let momentum = 0;
-  for (const h of recent) {
-    if (h.winner === 'A') momentum += 1;
-    else if (h.winner === 'B') momentum -= 1;
+  if (preMatch) {
+    lead = 0;
+    remaining = 9;
+    momentum = 0;
+  } else {
+    if (!c) return null;
+    if (match.status !== 'in_progress') return null;
+    if (c.isClosed) return null;
+    if (c.remaining <= 0) return null;
+    lead = c.lead;
+    remaining = c.remaining;
+    momentum = recentMomentum(match);
   }
 
   const pTie =
@@ -25,7 +31,15 @@ export function computeOdds(match) {
           ? 0.18
           : 0.2;
 
-  const aFraction = clamp(0.5 + 0.085 * momentum, 0.25, 0.75);
+  const hcpA = effectiveHandicap(match.format, match.sideA);
+  const hcpB = effectiveHandicap(match.format, match.sideB);
+  const hcpDiff = hcpB - hcpA; // positive favors A
+
+  const aFraction = clamp(
+    0.5 + 0.05 * momentum + 0.022 * hcpDiff,
+    0.22,
+    0.78
+  );
   const pA = aFraction * (1 - pTie);
   const pB = (1 - aFraction) * (1 - pTie);
 
@@ -41,15 +55,24 @@ export function computeOdds(match) {
     dist = next;
   }
 
-  let pAWin = 0;
-  let pBWin = 0;
-  let pHalve = 0;
+  let pAWinRaw = 0;
+  let pBWinRaw = 0;
+  let pHalveRaw = 0;
   for (const [delta, prob] of dist) {
-    const final = c.lead + delta;
-    if (final > 0) pAWin += prob;
-    else if (final < 0) pBWin += prob;
-    else pHalve += prob;
+    const final = lead + delta;
+    if (final > 0) pAWinRaw += prob;
+    else if (final < 0) pBWinRaw += prob;
+    else pHalveRaw += prob;
   }
+
+  // Shrink toward neutral so displayed odds reflect golf's real volatility.
+  const SHRINK = 0.6;
+  const NEUTRAL_A = 0.4;
+  const NEUTRAL_B = 0.4;
+  const NEUTRAL_H = 0.2;
+  const pAWin = SHRINK * pAWinRaw + (1 - SHRINK) * NEUTRAL_A;
+  const pBWin = SHRINK * pBWinRaw + (1 - SHRINK) * NEUTRAL_B;
+  const pHalve = SHRINK * pHalveRaw + (1 - SHRINK) * NEUTRAL_H;
 
   return {
     pAWin,
@@ -59,7 +82,42 @@ export function computeOdds(match) {
     moneyB: toMoneyline(pBWin),
     moneyHalve: toMoneyline(pHalve),
     momentum,
+    hcpA,
+    hcpB,
+    hcpDiff,
+    isPreMatch: preMatch,
   };
+}
+
+function recentMomentum(match) {
+  const recent = [...(match.holes || [])]
+    .sort((a, b) => b.holeIndex - a.holeIndex)
+    .slice(0, 3);
+  let m = 0;
+  for (const h of recent) {
+    if (h.winner === 'A') m += 1;
+    else if (h.winner === 'B') m -= 1;
+  }
+  return m;
+}
+
+function effectiveHandicap(format, players) {
+  if (!players || players.length === 0) return 0;
+  const hcps = players.map((p) => Number(p.handicap) || 0);
+  const sum = hcps.reduce((s, x) => s + x, 0);
+  const avg = sum / hcps.length;
+  const min = Math.min(...hcps);
+  switch (format) {
+    case 'best_ball':
+      return min;
+    case 'scramble':
+      return 0.85 * min + 0.15 * avg;
+    case 'alt_shot':
+      return avg;
+    case 'singles':
+    default:
+      return avg;
+  }
 }
 
 function add(map, key, value) {

@@ -25,11 +25,13 @@ function SetupInner({ state, onLogout }) {
         <div>
           <div className="text-sm font-semibold">Scorekeeper</div>
           <div className="text-xs text-ink/60">
-            Set lineups + starting holes per match.
+            Set handicaps, lineups + starting holes per match.
           </div>
         </div>
         <button className="btn" onClick={onLogout}>Lock</button>
       </div>
+
+      <HandicapsCard teams={state.teams} />
 
       {state.sessions.map((s) => (
         <section key={s.id} className="space-y-2">
@@ -223,6 +225,96 @@ function PlayerPicker({ team, limit, selected, onChange, disabled }) {
         })}
       </div>
     </div>
+  );
+}
+
+function HandicapsCard({ teams }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details
+      className="card overflow-hidden"
+      open={open}
+      onToggle={(e) => setOpen(e.currentTarget.open)}
+    >
+      <summary className="px-3 py-3 cursor-pointer flex items-center justify-between gap-2">
+        <div>
+          <div className="text-sm font-semibold">Handicaps</div>
+          <div className="text-xs text-ink/60">
+            Used in live odds. Gross match play — no strokes given.
+          </div>
+        </div>
+        <div className="text-ink/40">{open ? '▾' : '▸'}</div>
+      </summary>
+      <div className="px-3 pb-3 grid grid-cols-2 gap-3 border-t border-bunker/60 pt-3 bg-cream-dark/30">
+        {teams.map((team) => (
+          <div key={team.id}>
+            <div
+              className="text-[10px] uppercase tracking-widest font-semibold mb-1"
+              style={{ color: team.color }}
+            >
+              {team.name}
+            </div>
+            <div className="space-y-1.5">
+              {team.players.map((p) => (
+                <HandicapRow key={p.id} player={p} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function HandicapRow({ player }) {
+  const [val, setVal] = useState(String(player.handicap ?? 0));
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  // sync if server pushes a change while focused elsewhere
+  const remote = String(player.handicap ?? 0);
+  if (remote !== val && !busy && document.activeElement?.dataset?.playerId !== String(player.id)) {
+    // no-op: we just compare inside the closure to update if needed via effect
+  }
+
+  async function commit(next) {
+    const num = Number(next);
+    if (!Number.isFinite(num)) {
+      setErr('number required');
+      return;
+    }
+    setErr('');
+    setBusy(true);
+    try {
+      await api.setHandicap(player.id, num);
+    } catch (e) {
+      setErr(e.message || 'failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <label className="flex items-center justify-between gap-2 text-sm">
+      <span className="text-ink truncate">{player.name}</span>
+      <span className="flex items-center gap-1">
+        <input
+          data-player-id={player.id}
+          type="number"
+          inputMode="decimal"
+          step="0.1"
+          className="input w-16 text-right text-sm py-1 px-2"
+          value={val}
+          disabled={busy}
+          onChange={(e) => setVal(e.target.value)}
+          onBlur={() => commit(val)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur();
+          }}
+        />
+        {err && <span className="text-flag text-[10px]">{err}</span>}
+      </span>
+    </label>
   );
 }
 

@@ -17,6 +17,15 @@ const schemaPath = path.join(__dirname, 'schema.sql');
 const schema = fs.readFileSync(schemaPath, 'utf8');
 db.exec(schema);
 
+ensureColumn('player', 'handicap', 'REAL NOT NULL DEFAULT 0');
+
+function ensureColumn(table, column, defn) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!cols.find((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${defn}`);
+  }
+}
+
 export function dbPath() {
   return DB_PATH;
 }

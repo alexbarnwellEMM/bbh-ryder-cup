@@ -4,8 +4,28 @@ const TOURNAMENT_CODE = process.env.TOURNAMENT_CODE || 'BBH2026';
 const SCOREKEEPER_PIN = process.env.SCOREKEEPER_PIN || '1234';
 
 const TEAMS = [
-  { name: 'Team Al', color: '#1e40af', players: ['Alex', 'Tyler', 'Tripp', 'Austin', 'Drew'] },
-  { name: 'Team Unc', color: '#b91c1c', players: ['Jake', 'George', 'Cam', 'John', 'Matt'] },
+  {
+    name: 'Team Al',
+    color: '#1e40af',
+    players: [
+      { name: 'Alex', handicap: 27 },
+      { name: 'Tyler', handicap: 8 },
+      { name: 'Tripp', handicap: 24 },
+      { name: 'Austin', handicap: 21 },
+      { name: 'Drew', handicap: 10 },
+    ],
+  },
+  {
+    name: 'Team Unc',
+    color: '#b91c1c',
+    players: [
+      { name: 'Jake', handicap: 32 },
+      { name: 'George', handicap: 13 },
+      { name: 'Cam', handicap: 14 },
+      { name: 'John', handicap: 8 },
+      { name: 'Matt', handicap: 22 },
+    ],
+  },
 ];
 
 const SESSIONS = [
@@ -53,7 +73,9 @@ export function seedIfEmpty() {
     'INSERT INTO tournament (id, name, code, scorekeeper_pin) VALUES (1, ?, ?, ?)'
   );
   const insertTeam = db.prepare('INSERT INTO team (name, color) VALUES (?, ?)');
-  const insertPlayer = db.prepare('INSERT INTO player (name, team_id) VALUES (?, ?)');
+  const insertPlayer = db.prepare(
+    'INSERT INTO player (name, team_id, handicap) VALUES (?, ?, ?)'
+  );
   const insertSession = db.prepare('INSERT INTO session (name, display_order) VALUES (?, ?)');
   const insertMatch = db.prepare(
     'INSERT INTO match (session_id, format, team_a_size, team_b_size, display_order) VALUES (?, ?, ?, ?, ?)'
@@ -67,8 +89,8 @@ export function seedIfEmpty() {
 
     for (const team of TEAMS) {
       const { lastInsertRowid: teamId } = insertTeam.run(team.name, team.color);
-      for (const playerName of team.players) {
-        insertPlayer.run(playerName, teamId);
+      for (const player of team.players) {
+        insertPlayer.run(player.name, teamId, player.handicap);
       }
     }
 
@@ -88,7 +110,27 @@ export function seedIfEmpty() {
   return { seeded: true };
 }
 
+export function ensureHandicapsIfUnset() {
+  const anyNonZero = db
+    .prepare('SELECT COUNT(*) AS c FROM player WHERE handicap != 0')
+    .get().c;
+  if (anyNonZero > 0) return { applied: false };
+
+  const upd = db.prepare('UPDATE player SET handicap = ? WHERE name = ?');
+  const tx = db.transaction(() => {
+    for (const team of TEAMS) {
+      for (const p of team.players) {
+        upd.run(p.handicap, p.name);
+      }
+    }
+  });
+  tx();
+  return { applied: true };
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const { seeded } = seedIfEmpty();
+  const hcp = ensureHandicapsIfUnset();
   console.log(seeded ? 'Seeded.' : 'Already seeded; no changes.');
+  if (hcp.applied) console.log('Pre-filled handicaps for existing players.');
 }

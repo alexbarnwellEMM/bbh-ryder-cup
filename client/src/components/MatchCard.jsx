@@ -58,26 +58,46 @@ export default function MatchCard({ match, teams }) {
       </div>
 
       {(() => {
-        const odds = inProgress ? computeOdds(match) : null;
-        const aLabel = odds ? `(${formatMoneyline(odds.moneyA)})` : null;
-        const bLabel = odds ? `(${formatMoneyline(odds.moneyB)})` : null;
+        let odds = null;
+        if (inProgress) odds = computeOdds(match);
+        else if (match.status === 'pending') odds = computeOdds(match, { preMatch: true });
+        else if (isFinal) odds = computeOdds(match, { preMatch: true });
+
+        const aLabel = odds ? `ML ${formatMoneyline(odds.moneyA)}` : null;
+        const bLabel = odds ? `ML ${formatMoneyline(odds.moneyB)}` : null;
+
+        const winner = isFinal && c
+          ? c.lead > 0 ? 'A' : c.lead < 0 ? 'B' : 'halve'
+          : null;
+
         return (
-          <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center mt-3">
-            <PlayerSide
-              team={a}
-              players={match.sideA}
-              odds={aLabel}
-              dim={isFinal && c?.lead < 0}
-            />
-            <ScoreCenter match={match} teams={teams} />
-            <PlayerSide
-              team={b}
-              players={match.sideB}
-              odds={bLabel}
-              alignRight
-              dim={isFinal && c?.lead > 0}
-            />
-          </div>
+          <>
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center mt-3">
+              <PlayerSide
+                team={a}
+                players={match.sideA}
+                odds={aLabel}
+                oddsTone={oddsToneFor('A', winner)}
+                dim={isFinal && c?.lead < 0}
+              />
+              <ScoreCenter match={match} teams={teams} />
+              <PlayerSide
+                team={b}
+                players={match.sideB}
+                odds={bLabel}
+                oddsTone={oddsToneFor('B', winner)}
+                alignRight
+                dim={isFinal && c?.lead > 0}
+              />
+            </div>
+            {odds && (match.status === 'pending' || isFinal) && (
+              <HalveOddsLine
+                odds={odds}
+                highlight={winner === 'halve'}
+                isFinal={isFinal}
+              />
+            )}
+          </>
         );
       })()}
 
@@ -86,7 +106,7 @@ export default function MatchCard({ match, teams }) {
   );
 }
 
-function PlayerSide({ team, players, alignRight, dim, odds }) {
+function PlayerSide({ team, players, alignRight, dim, odds, oddsTone }) {
   const namesNode =
     players.length === 0 ? (
       <span className="text-ink/40 text-sm italic">tbd</span>
@@ -98,9 +118,25 @@ function PlayerSide({ team, players, alignRight, dim, odds }) {
       </span>
     );
 
+  let oddsClass = 'text-ink/55';
+  let oddsStyle = undefined;
+  let oddsWeight = 'font-semibold';
+  if (oddsTone === 'win') {
+    oddsClass = '';
+    oddsStyle = { color: team.color };
+    oddsWeight = 'font-bold';
+  } else if (oddsTone === 'loss') {
+    oddsClass = 'text-ink/30';
+    oddsWeight = 'font-medium';
+  }
+
   const oddsNode = odds ? (
-    <span className="text-[11px] tabular-nums font-semibold text-ink/55 leading-none">
+    <span
+      className={`text-[11px] tabular-nums leading-none ${oddsWeight} ${oddsClass}`}
+      style={oddsStyle}
+    >
       {odds}
+      {oddsTone === 'win' && <span className="ml-1">✓</span>}
     </span>
   ) : null;
 
@@ -297,6 +333,29 @@ function ScoreCell({ hole, side, teamColor }) {
       {score}
     </div>
   );
+}
+
+function HalveOddsLine({ odds, highlight, isFinal }) {
+  const labelTone = highlight
+    ? 'text-fairway font-bold'
+    : isFinal
+      ? 'text-ink/35'
+      : 'text-ink/55';
+  return (
+    <div className={`text-center text-[10px] uppercase tracking-widest mt-1.5 ${labelTone}`}>
+      {isFinal ? 'Pre-match halve' : 'Halve'}{' '}
+      <span className="tabular-nums normal-case">
+        ML {formatMoneyline(odds.moneyHalve)}
+      </span>
+      {highlight && <span className="ml-1">✓</span>}
+    </div>
+  );
+}
+
+function oddsToneFor(side, winner) {
+  if (!winner) return 'neutral';
+  if (winner === side) return 'win';
+  return 'loss';
 }
 
 function bigStatus(c) {

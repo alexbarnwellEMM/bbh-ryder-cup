@@ -31,6 +31,9 @@ export const api = {
 
   startTiebreaker: (holes) => request('POST', '/tiebreaker/start', { holes }),
   scoreTiebreaker: (body) => request('POST', '/tiebreaker/score', body),
+
+  setHandicap: (playerId, handicap) =>
+    request('PATCH', `/player/${playerId}/handicap`, { handicap }),
 };
 
 export const COURSE_PARS = [5, 4, 5, 3, 4, 4, 4, 4, 3];

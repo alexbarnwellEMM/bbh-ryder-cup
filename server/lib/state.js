@@ -86,7 +86,7 @@ export function getFullState() {
     .all();
 
   const matchPlayers = db.prepare(
-    `SELECT mp.match_id, mp.side, p.id, p.name, p.team_id
+    `SELECT mp.match_id, mp.side, p.id, p.name, p.team_id, p.handicap
        FROM match_player mp
        JOIN player p ON p.id = mp.player_id
       WHERE mp.match_id = ?`
@@ -98,8 +98,14 @@ export function getFullState() {
 
   const matchOut = matches.map((m) => {
     const players = matchPlayers.all(m.id);
-    const sideA = players.filter((p) => p.side === 'A').map(({ side, ...rest }) => rest);
-    const sideB = players.filter((p) => p.side === 'B').map(({ side, ...rest }) => rest);
+    const toPlayer = (p) => ({
+      id: p.id,
+      name: p.name,
+      teamId: p.team_id,
+      handicap: p.handicap ?? 0,
+    });
+    const sideA = players.filter((p) => p.side === 'A').map(toPlayer);
+    const sideB = players.filter((p) => p.side === 'B').map(toPlayer);
     const holes = matchHoles.all(m.id);
     const computed = computeMatch(holes);
     const holePlayOrder = m.start_hole ? holeOrderFromStart(m.start_hole) : null;
@@ -150,7 +156,12 @@ export function getFullState() {
       name: t.name,
       color: t.color,
       side,
-      players: playersByTeam.all(t.id).map((p) => ({ id: p.id, name: p.name, teamId: p.team_id })),
+      players: playersByTeam.all(t.id).map((p) => ({
+        id: p.id,
+        name: p.name,
+        teamId: p.team_id,
+        handicap: p.handicap ?? 0,
+      })),
       totalPoints,
     };
   });
