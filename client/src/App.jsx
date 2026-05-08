@@ -98,7 +98,10 @@ export default function App() {
             }
           />
           <Route path="/players" element={<Players state={state} />} />
-          <Route path="/picks" element={<Picks state={state} />} />
+          <Route
+            path="/picks"
+            element={<Picks state={state} isScorekeeper={isScorekeeper} />}
+          />
           <Route
             path="/tiebreaker"
             element={

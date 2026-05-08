@@ -3,6 +3,7 @@ import { db } from '../db.js';
 import { broadcast } from '../lib/broadcast.js';
 import { getFullState } from '../lib/state.js';
 import { computeOdds, payoutFor } from '../lib/odds.js';
+import { requirePin } from '../lib/auth.js';
 
 const router = Router();
 
@@ -126,6 +127,24 @@ router.delete('/', (req, res) => {
   );
   broadcast('state', getFullState());
   res.json({ ok: true });
+});
+
+router.delete('/bettor/:id', requirePin, (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'invalid bettor id' });
+  }
+  const existing = db.prepare('SELECT id, name FROM bettor WHERE id = ?').get(id);
+  if (!existing) return res.status(404).json({ error: 'bettor not found' });
+
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM bet WHERE bettor_id = ?').run(id);
+    db.prepare('DELETE FROM bettor WHERE id = ?').run(id);
+  });
+  tx();
+
+  broadcast('state', getFullState());
+  res.json({ ok: true, deleted: existing.name });
 });
 
 function matchSnapshot(matchId) {

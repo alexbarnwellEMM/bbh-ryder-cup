@@ -40,6 +40,7 @@ export const api = {
     request('POST', '/bet', { name, code, matchId, pick }),
   cancelBet: (name, code, matchId) =>
     request('DELETE', '/bet', { name, code, matchId }),
+  deleteBettor: (id) => request('DELETE', `/bet/bettor/${id}`),
 };
 
 export const COURSE_PARS = [5, 4, 5, 3, 4, 4, 4, 4, 3];

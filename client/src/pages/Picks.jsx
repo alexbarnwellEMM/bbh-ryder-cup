@@ -10,7 +10,7 @@ const FORMAT_LABEL = {
   singles: 'Singles',
 };
 
-export default function Picks({ state }) {
+export default function Picks({ state, isScorekeeper }) {
   const [name, setName] = useState(() => localStorage.getItem('bbh_bettor') || '');
   const [code, setCode] = useState(() => localStorage.getItem('bbh_bettor_code') || '');
   const [editing, setEditing] = useState(!name || !code);
@@ -36,6 +36,7 @@ export default function Picks({ state }) {
       <Login
         bettors={state.bets || []}
         existingName={name}
+        isScorekeeper={isScorekeeper}
         onLogin={onLogin}
         onCancel={name && code ? () => setEditing(false) : null}
       />
@@ -47,13 +48,14 @@ export default function Picks({ state }) {
       state={state}
       name={name}
       code={code}
+      isScorekeeper={isScorekeeper}
       onSwitch={() => setEditing(true)}
       onLogout={logout}
     />
   );
 }
 
-function Login({ bettors, existingName, onLogin, onCancel }) {
+function Login({ bettors, existingName, isScorekeeper, onLogin, onCancel }) {
   const [draftName, setDraftName] = useState(existingName || '');
   const [draftCode, setDraftCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -132,12 +134,12 @@ function Login({ bettors, existingName, onLogin, onCancel }) {
           </button>
         )}
       </div>
-      <Leaderboard bettors={bettors} highlight={existingName} />
+      <Leaderboard bettors={bettors} highlight={existingName} isScorekeeper={isScorekeeper} />
     </div>
   );
 }
 
-function PicksInner({ state, name, code, onSwitch, onLogout }) {
+function PicksInner({ state, name, code, isScorekeeper, onSwitch, onLogout }) {
   const myBets = useMemo(() => {
     const me = (state.bets || []).find(
       (b) => b.name.toLowerCase() === name.toLowerCase()
@@ -161,7 +163,7 @@ function PicksInner({ state, name, code, onSwitch, onLogout }) {
         </div>
       </div>
 
-      <Leaderboard bettors={state.bets || []} highlight={name} />
+      <Leaderboard bettors={state.bets || []} highlight={name} isScorekeeper={isScorekeeper} />
 
       <div className="space-y-2">
         {state.sessions.map((s) => (
@@ -372,7 +374,7 @@ function PickButton({
   );
 }
 
-function Leaderboard({ bettors, highlight }) {
+function Leaderboard({ bettors, highlight, isScorekeeper }) {
   if (!bettors.length) {
     return (
       <div className="card p-3 text-sm text-ink/60">
@@ -391,33 +393,73 @@ function Leaderboard({ bettors, highlight }) {
       </div>
       <div className="divide-y divide-bunker/40">
         {sorted.map((b, i) => (
-          <div
+          <LeaderboardRow
             key={b.id}
-            className={`px-3 py-2 grid grid-cols-[24px_1fr_auto] items-center gap-2 ${
-              highlight && b.name.toLowerCase() === highlight.toLowerCase()
-                ? 'bg-fairway/5'
-                : ''
-            }`}
-          >
-            <div className="text-sm tabular-nums text-ink/55 font-semibold">
-              {i + 1}.
-            </div>
-            <div className="text-sm font-medium truncate">{b.name}</div>
-            <div className="flex items-baseline gap-3 text-sm tabular-nums">
-              <span className="text-ink/65">
-                {b.wins}/{b.settled} · {b.open} open
-              </span>
-              <span
-                className={`font-display font-bold text-base ${
-                  b.points >= 0 ? 'text-fairway' : 'text-flag'
-                }`}
-              >
-                {b.points > 0 ? '+' : ''}
-                {b.points}
-              </span>
-            </div>
-          </div>
+            bettor={b}
+            rank={i + 1}
+            highlight={highlight}
+            isScorekeeper={isScorekeeper}
+          />
         ))}
+      </div>
+    </div>
+  );
+}
+
+function LeaderboardRow({ bettor, rank, highlight, isScorekeeper }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const isMe =
+    highlight && bettor.name.toLowerCase() === highlight.toLowerCase();
+
+  async function remove() {
+    if (!isScorekeeper) return;
+    if (!window.confirm(`Delete "${bettor.name}" and all their picks?`)) return;
+    setErr('');
+    setBusy(true);
+    try {
+      await api.deleteBettor(bettor.id);
+    } catch (e) {
+      setErr(e.message || 'failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      className={`px-3 py-2 grid grid-cols-[24px_1fr_auto] items-center gap-2 ${
+        isMe ? 'bg-fairway/5' : ''
+      }`}
+    >
+      <div className="text-sm tabular-nums text-ink/55 font-semibold">{rank}.</div>
+      <div className="text-sm font-medium truncate flex items-center gap-2">
+        {bettor.name}
+        {err && <span className="text-flag text-[10px]">{err}</span>}
+      </div>
+      <div className="flex items-center gap-3 text-sm tabular-nums">
+        <span className="text-ink/65">
+          {bettor.wins}/{bettor.settled} · {bettor.open} open
+        </span>
+        <span
+          className={`font-display font-bold text-base ${
+            bettor.points >= 0 ? 'text-fairway' : 'text-flag'
+          }`}
+        >
+          {bettor.points > 0 ? '+' : ''}
+          {bettor.points}
+        </span>
+        {isScorekeeper && (
+          <button
+            onClick={remove}
+            disabled={busy}
+            className="text-flag/70 hover:text-flag text-base leading-none disabled:opacity-30"
+            aria-label={`Delete ${bettor.name}`}
+            title={`Delete ${bettor.name}`}
+          >
+            ×
+          </button>
+        )}
       </div>
     </div>
   );
