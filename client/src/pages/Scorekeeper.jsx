@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PinGate from './PinGate.jsx';
 import HoleEntry from '../components/HoleEntry.jsx';
+import BestBallHoleEntry from '../components/BestBallHoleEntry.jsx';
 import { api } from '../lib/api.js';
 import { hexToRgba } from '../lib/colors.js';
 
@@ -245,16 +246,31 @@ function MatchScoring({ state, match }) {
         </div>
       ) : (
         <>
-          <HoleEntry
-            holeNumber={playOrder[nextIndex]}
-            holeIndex={nextIndex}
-            par={state.course?.holes?.[playOrder[nextIndex] - 1]?.par}
-            teamA={a}
-            teamB={b}
-            existing={holesByIndex.get(nextIndex)}
-            onSubmit={submit}
-            disabled={busy}
-          />
+          {match.format === 'best_ball' && match.sideA.length === 2 && match.sideB.length === 2 ? (
+            <BestBallHoleEntry
+              holeNumber={playOrder[nextIndex]}
+              holeIndex={nextIndex}
+              par={state.course?.holes?.[playOrder[nextIndex] - 1]?.par}
+              teamA={a}
+              teamB={b}
+              sideA={match.sideA}
+              sideB={match.sideB}
+              existing={holesByIndex.get(nextIndex)}
+              onSubmit={submit}
+              disabled={busy}
+            />
+          ) : (
+            <HoleEntry
+              holeNumber={playOrder[nextIndex]}
+              holeIndex={nextIndex}
+              par={state.course?.holes?.[playOrder[nextIndex] - 1]?.par}
+              teamA={a}
+              teamB={b}
+              existing={holesByIndex.get(nextIndex)}
+              onSubmit={submit}
+              disabled={busy}
+            />
+          )}
           {holesByIndex.size > 0 && (
             <button className="btn w-full" onClick={undoLast} disabled={busy}>
               Undo last hole
@@ -267,19 +283,35 @@ function MatchScoring({ state, match }) {
         <details className="card p-3">
           <summary className="text-sm text-ink/75 cursor-pointer">Edit a previous hole</summary>
           <div className="mt-2 space-y-2">
-            {[...holesByIndex.values()].sort((x, y) => x.holeIndex - y.holeIndex).map((h) => (
-              <HoleEntry
-                key={h.id}
-                holeNumber={h.holeNumber}
-                holeIndex={h.holeIndex}
-                par={state.course?.holes?.[h.holeNumber - 1]?.par}
-                teamA={a}
-                teamB={b}
-                existing={h}
-                onSubmit={submit}
-                disabled={busy}
-              />
-            ))}
+            {[...holesByIndex.values()].sort((x, y) => x.holeIndex - y.holeIndex).map((h) =>
+              match.format === 'best_ball' && match.sideA.length === 2 && match.sideB.length === 2 ? (
+                <BestBallHoleEntry
+                  key={h.id}
+                  holeNumber={h.holeNumber}
+                  holeIndex={h.holeIndex}
+                  par={state.course?.holes?.[h.holeNumber - 1]?.par}
+                  teamA={a}
+                  teamB={b}
+                  sideA={match.sideA}
+                  sideB={match.sideB}
+                  existing={h}
+                  onSubmit={submit}
+                  disabled={busy}
+                />
+              ) : (
+                <HoleEntry
+                  key={h.id}
+                  holeNumber={h.holeNumber}
+                  holeIndex={h.holeIndex}
+                  par={state.course?.holes?.[h.holeNumber - 1]?.par}
+                  teamA={a}
+                  teamB={b}
+                  existing={h}
+                  onSubmit={submit}
+                  disabled={busy}
+                />
+              )
+            )}
           </div>
         </details>
       )}

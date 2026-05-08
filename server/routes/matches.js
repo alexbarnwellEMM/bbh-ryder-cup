@@ -76,16 +76,10 @@ router.post('/:id/start', requirePin, (req, res) => {
 
 router.post('/:id/hole', requirePin, (req, res) => {
   const matchId = Number(req.params.id);
-  const { holeIndex, teamAScore, teamBScore } = req.body || {};
+  const { holeIndex } = req.body || {};
 
   if (!Number.isInteger(holeIndex) || holeIndex < 0 || holeIndex > 8) {
     return res.status(400).json({ error: 'holeIndex must be 0-8' });
-  }
-  if (!Number.isInteger(teamAScore) || !Number.isInteger(teamBScore)) {
-    return res.status(400).json({ error: 'scores required' });
-  }
-  if (teamAScore < 1 || teamBScore < 1) {
-    return res.status(400).json({ error: 'scores must be >= 1' });
   }
 
   const match = db.prepare('SELECT * FROM match WHERE id = ?').get(matchId);
@@ -95,6 +89,45 @@ router.post('/:id/hole', requirePin, (req, res) => {
     return res.status(409).json({ error: 'match closed' });
   }
 
+  let teamAScore;
+  let teamBScore;
+  let aPlayerScores = null;
+  let bPlayerScores = null;
+
+  if (match.format === 'best_ball') {
+    aPlayerScores = req.body.teamAPlayerScores;
+    bPlayerScores = req.body.teamBPlayerScores;
+    if (
+      !aPlayerScores ||
+      !bPlayerScores ||
+      typeof aPlayerScores !== 'object' ||
+      typeof bPlayerScores !== 'object'
+    ) {
+      return res
+        .status(400)
+        .json({ error: 'best_ball requires teamAPlayerScores and teamBPlayerScores' });
+    }
+    const aValues = Object.values(aPlayerScores).map((v) => Number(v));
+    const bValues = Object.values(bPlayerScores).map((v) => Number(v));
+    if (aValues.length === 0 || bValues.length === 0) {
+      return res.status(400).json({ error: 'need a score for each player' });
+    }
+    if (![...aValues, ...bValues].every((v) => Number.isInteger(v) && v >= 1)) {
+      return res.status(400).json({ error: 'scores must be positive integers' });
+    }
+    teamAScore = Math.min(...aValues);
+    teamBScore = Math.min(...bValues);
+  } else {
+    teamAScore = req.body.teamAScore;
+    teamBScore = req.body.teamBScore;
+    if (!Number.isInteger(teamAScore) || !Number.isInteger(teamBScore)) {
+      return res.status(400).json({ error: 'scores required' });
+    }
+    if (teamAScore < 1 || teamBScore < 1) {
+      return res.status(400).json({ error: 'scores must be >= 1' });
+    }
+  }
+
   const holeNumber = ((match.start_hole - 1 + holeIndex) % 9) + 1;
   const winner = teamAScore < teamBScore ? 'A' : teamAScore > teamBScore ? 'B' : 'tie';
 
@@ -102,17 +135,35 @@ router.post('/:id/hole', requirePin, (req, res) => {
     .prepare('SELECT id FROM hole_result WHERE match_id = ? AND hole_index = ?')
     .get(matchId, holeIndex);
 
+  let holeResultId;
   if (existing) {
+    holeResultId = existing.id;
     db.prepare(
       `UPDATE hole_result
           SET team_a_score = ?, team_b_score = ?, winner = ?, hole_number = ?
         WHERE id = ?`
-    ).run(teamAScore, teamBScore, winner, holeNumber, existing.id);
+    ).run(teamAScore, teamBScore, winner, holeNumber, holeResultId);
   } else {
-    db.prepare(
-      `INSERT INTO hole_result (match_id, hole_index, hole_number, team_a_score, team_b_score, winner)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(matchId, holeIndex, holeNumber, teamAScore, teamBScore, winner);
+    const result = db
+      .prepare(
+        `INSERT INTO hole_result (match_id, hole_index, hole_number, team_a_score, team_b_score, winner)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .run(matchId, holeIndex, holeNumber, teamAScore, teamBScore, winner);
+    holeResultId = result.lastInsertRowid;
+  }
+
+  if (aPlayerScores && bPlayerScores) {
+    db.prepare('DELETE FROM hole_player_score WHERE hole_result_id = ?').run(holeResultId);
+    const ins = db.prepare(
+      'INSERT INTO hole_player_score (hole_result_id, player_id, score) VALUES (?, ?, ?)'
+    );
+    for (const [pid, score] of Object.entries(aPlayerScores)) {
+      ins.run(holeResultId, Number(pid), Number(score));
+    }
+    for (const [pid, score] of Object.entries(bPlayerScores)) {
+      ins.run(holeResultId, Number(pid), Number(score));
+    }
   }
 
   recomputeMatch(matchId);

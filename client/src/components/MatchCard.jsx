@@ -228,6 +228,10 @@ function HoleStrip({ match, teamA, teamB }) {
   if (!match.holePlayOrder || match.holePlayOrder.length === 0) return null;
   const byIndex = new Map(match.holes.map((h) => [h.holeIndex, h]));
   const order = match.holePlayOrder;
+  const isBestBall =
+    match.format === 'best_ball' &&
+    match.sideA.length === 2 &&
+    match.sideB.length === 2;
 
   const gridCols = 'grid grid-cols-[72px_repeat(9,minmax(0,1fr))] items-center gap-x-1';
 
@@ -250,34 +254,126 @@ function HoleStrip({ match, teamA, teamB }) {
           );
         })}
       </div>
-      <div className={gridCols}>
-        <TeamLabel team={teamA} />
-        {order.map((_, idx) => {
-          const hole = byIndex.get(idx);
-          return (
-            <ScoreCell
-              key={`a${idx}`}
-              hole={hole}
+
+      {isBestBall ? (
+        <>
+          <TeamSubheader team={teamA} />
+          {match.sideA.map((p) => (
+            <PlayerScoreRow
+              key={`a-${p.id}`}
+              gridCols={gridCols}
+              player={p}
               side="A"
               teamColor={teamA.color}
+              order={order}
+              byIndex={byIndex}
             />
-          );
-        })}
-      </div>
-      <div className={gridCols}>
-        <TeamLabel team={teamB} />
-        {order.map((_, idx) => {
-          const hole = byIndex.get(idx);
-          return (
-            <ScoreCell
-              key={`b${idx}`}
-              hole={hole}
+          ))}
+          <TeamSubheader team={teamB} />
+          {match.sideB.map((p) => (
+            <PlayerScoreRow
+              key={`b-${p.id}`}
+              gridCols={gridCols}
+              player={p}
               side="B"
               teamColor={teamB.color}
+              order={order}
+              byIndex={byIndex}
             />
-          );
-        })}
+          ))}
+        </>
+      ) : (
+        <>
+          <div className={gridCols}>
+            <TeamLabel team={teamA} />
+            {order.map((_, idx) => {
+              const hole = byIndex.get(idx);
+              return (
+                <ScoreCell
+                  key={`a${idx}`}
+                  hole={hole}
+                  side="A"
+                  teamColor={teamA.color}
+                />
+              );
+            })}
+          </div>
+          <div className={gridCols}>
+            <TeamLabel team={teamB} />
+            {order.map((_, idx) => {
+              const hole = byIndex.get(idx);
+              return (
+                <ScoreCell
+                  key={`b${idx}`}
+                  hole={hole}
+                  side="B"
+                  teamColor={teamB.color}
+                />
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function TeamSubheader({ team }) {
+  return (
+    <div
+      className="text-[10px] uppercase tracking-widest font-semibold pt-1 pl-1"
+      style={{ color: team.color }}
+    >
+      {team.name}
+    </div>
+  );
+}
+
+function PlayerScoreRow({ gridCols, player, side, teamColor, order, byIndex }) {
+  return (
+    <div className={gridCols}>
+      <div className="text-[10px] text-ink/70 text-right pr-1 truncate font-medium pl-3">
+        {player.name}
       </div>
+      {order.map((_, idx) => {
+        const hole = byIndex.get(idx);
+        if (!hole) {
+          return (
+            <div
+              key={idx}
+              className="text-center text-[11px] leading-none"
+            >
+              &nbsp;
+            </div>
+          );
+        }
+        const score = hole.playerScores?.[player.id];
+        if (score == null) {
+          return (
+            <div
+              key={idx}
+              className="text-center text-[11px] leading-none text-ink/25"
+            >
+              &nbsp;
+            </div>
+          );
+        }
+        const teamBest = side === 'A' ? hole.teamAScore : hole.teamBScore;
+        const isBest = score === teamBest;
+        const won = hole.winner === side;
+        let weight = 'opacity-45';
+        if (isBest && won) weight = 'font-bold';
+        else if (isBest) weight = 'font-semibold opacity-90';
+        return (
+          <div
+            key={idx}
+            className={`text-center text-[11px] tabular-nums leading-none ${weight}`}
+            style={{ color: teamColor }}
+          >
+            {score}
+          </div>
+        );
+      })}
     </div>
   );
 }

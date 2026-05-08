@@ -96,6 +96,10 @@ export function getFullState() {
     'SELECT * FROM hole_result WHERE match_id = ? ORDER BY hole_index'
   );
 
+  const playerScoresStmt = db.prepare(
+    'SELECT player_id, score FROM hole_player_score WHERE hole_result_id = ?'
+  );
+
   const matchOut = matches.map((m) => {
     const players = matchPlayers.all(m.id);
     const toPlayer = (p) => ({
@@ -124,14 +128,21 @@ export function getFullState() {
       displayOrder: m.display_order,
       sideA,
       sideB,
-      holes: holes.map((h) => ({
-        id: h.id,
-        holeIndex: h.hole_index,
-        holeNumber: h.hole_number,
-        teamAScore: h.team_a_score,
-        teamBScore: h.team_b_score,
-        winner: h.winner,
-      })),
+      holes: holes.map((h) => {
+        const ps = {};
+        for (const row of playerScoresStmt.all(h.id)) {
+          ps[row.player_id] = row.score;
+        }
+        return {
+          id: h.id,
+          holeIndex: h.hole_index,
+          holeNumber: h.hole_number,
+          teamAScore: h.team_a_score,
+          teamBScore: h.team_b_score,
+          winner: h.winner,
+          playerScores: ps,
+        };
+      }),
       holePlayOrder,
       computed,
     };

@@ -57,6 +57,14 @@ CREATE TABLE IF NOT EXISTS hole_result (
   UNIQUE(match_id, hole_index)
 );
 
+CREATE TABLE IF NOT EXISTS hole_player_score (
+  id INTEGER PRIMARY KEY,
+  hole_result_id INTEGER NOT NULL REFERENCES hole_result(id) ON DELETE CASCADE,
+  player_id INTEGER NOT NULL REFERENCES player(id),
+  score INTEGER,
+  UNIQUE(hole_result_id, player_id)
+);
+
 CREATE TABLE IF NOT EXISTS tiebreaker (
   id INTEGER PRIMARY KEY,
   active INTEGER DEFAULT 0,
