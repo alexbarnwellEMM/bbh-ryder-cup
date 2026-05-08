@@ -3,7 +3,7 @@ import { db } from '../db.js';
 import { broadcast } from '../lib/broadcast.js';
 import { getFullState } from '../lib/state.js';
 import { computeOdds, payoutFor } from '../lib/odds.js';
-import { requirePin } from '../lib/auth.js';
+import { requireAdmin } from '../lib/auth.js';
 
 const router = Router();
 
@@ -129,7 +129,7 @@ router.delete('/', (req, res) => {
   res.json({ ok: true });
 });
 
-router.delete('/bettor/:id', requirePin, (req, res) => {
+router.delete('/bettor/:id', requireAdmin, (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id <= 0) {
     return res.status(400).json({ error: 'invalid bettor id' });

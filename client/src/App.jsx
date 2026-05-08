@@ -15,19 +15,28 @@ import Final from './pages/Final.jsx';
 export default function App() {
   const { state, connected } = useSSE('/api/sse');
   const [isScorekeeper, setIsScorekeeper] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    api.authMe().then((r) => setIsScorekeeper(!!r?.isScorekeeper)).catch(() => {});
+    api
+      .authMe()
+      .then((r) => {
+        setIsScorekeeper(!!r?.isScorekeeper);
+        setIsAdmin(!!r?.isAdmin);
+      })
+      .catch(() => {});
   }, []);
 
   async function login(pin) {
-    await api.authPin(pin);
+    const r = await api.authPin(pin);
     setIsScorekeeper(true);
+    setIsAdmin(!!r?.isAdmin);
   }
 
   async function logout() {
     await api.logout();
     setIsScorekeeper(false);
+    setIsAdmin(false);
   }
 
   if (!state) {
@@ -100,7 +109,7 @@ export default function App() {
           <Route path="/players" element={<Players state={state} />} />
           <Route
             path="/picks"
-            element={<Picks state={state} isScorekeeper={isScorekeeper} />}
+            element={<Picks state={state} isAdmin={isAdmin} />}
           />
           <Route
             path="/tiebreaker"

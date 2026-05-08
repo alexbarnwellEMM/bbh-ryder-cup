@@ -10,7 +10,7 @@ const FORMAT_LABEL = {
   singles: 'Singles',
 };
 
-export default function Picks({ state, isScorekeeper }) {
+export default function Picks({ state, isAdmin }) {
   const [name, setName] = useState(() => localStorage.getItem('bbh_bettor') || '');
   const [code, setCode] = useState(() => localStorage.getItem('bbh_bettor_code') || '');
   const [editing, setEditing] = useState(!name || !code);
@@ -36,7 +36,7 @@ export default function Picks({ state, isScorekeeper }) {
       <Login
         bettors={state.bets || []}
         existingName={name}
-        isScorekeeper={isScorekeeper}
+        isAdmin={isAdmin}
         onLogin={onLogin}
         onCancel={name && code ? () => setEditing(false) : null}
       />
@@ -48,14 +48,14 @@ export default function Picks({ state, isScorekeeper }) {
       state={state}
       name={name}
       code={code}
-      isScorekeeper={isScorekeeper}
+      isAdmin={isAdmin}
       onSwitch={() => setEditing(true)}
       onLogout={logout}
     />
   );
 }
 
-function Login({ bettors, existingName, isScorekeeper, onLogin, onCancel }) {
+function Login({ bettors, existingName, isAdmin, onLogin, onCancel }) {
   const [draftName, setDraftName] = useState(existingName || '');
   const [draftCode, setDraftCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -134,12 +134,12 @@ function Login({ bettors, existingName, isScorekeeper, onLogin, onCancel }) {
           </button>
         )}
       </div>
-      <Leaderboard bettors={bettors} highlight={existingName} isScorekeeper={isScorekeeper} />
+      <Leaderboard bettors={bettors} highlight={existingName} isAdmin={isAdmin} />
     </div>
   );
 }
 
-function PicksInner({ state, name, code, isScorekeeper, onSwitch, onLogout }) {
+function PicksInner({ state, name, code, isAdmin, onSwitch, onLogout }) {
   const myBets = useMemo(() => {
     const me = (state.bets || []).find(
       (b) => b.name.toLowerCase() === name.toLowerCase()
@@ -163,7 +163,7 @@ function PicksInner({ state, name, code, isScorekeeper, onSwitch, onLogout }) {
         </div>
       </div>
 
-      <Leaderboard bettors={state.bets || []} highlight={name} isScorekeeper={isScorekeeper} />
+      <Leaderboard bettors={state.bets || []} highlight={name} isAdmin={isAdmin} />
 
       <div className="space-y-2">
         {state.sessions.map((s) => (
@@ -374,7 +374,7 @@ function PickButton({
   );
 }
 
-function Leaderboard({ bettors, highlight, isScorekeeper }) {
+function Leaderboard({ bettors, highlight, isAdmin }) {
   if (!bettors.length) {
     return (
       <div className="card p-3 text-sm text-ink/60">
@@ -398,7 +398,7 @@ function Leaderboard({ bettors, highlight, isScorekeeper }) {
             bettor={b}
             rank={i + 1}
             highlight={highlight}
-            isScorekeeper={isScorekeeper}
+            isAdmin={isAdmin}
           />
         ))}
       </div>
@@ -406,14 +406,14 @@ function Leaderboard({ bettors, highlight, isScorekeeper }) {
   );
 }
 
-function LeaderboardRow({ bettor, rank, highlight, isScorekeeper }) {
+function LeaderboardRow({ bettor, rank, highlight, isAdmin }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const isMe =
     highlight && bettor.name.toLowerCase() === highlight.toLowerCase();
 
   async function remove() {
-    if (!isScorekeeper) return;
+    if (!isAdmin) return;
     if (!window.confirm(`Delete "${bettor.name}" and all their picks?`)) return;
     setErr('');
     setBusy(true);
@@ -449,7 +449,7 @@ function LeaderboardRow({ bettor, rank, highlight, isScorekeeper }) {
           {bettor.points > 0 ? '+' : ''}
           {bettor.points}
         </span>
-        {isScorekeeper && (
+        {isAdmin && (
           <button
             onClick={remove}
             disabled={busy}

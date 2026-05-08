@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db.js';
 import { getFullState } from '../lib/state.js';
+import { isScorekeeper, isAdmin, ADMIN_PIN } from '../lib/auth.js';
 
 const router = Router();
 
@@ -15,21 +16,33 @@ router.post('/auth/scorekeeper', (req, res) => {
   const tournament = db.prepare('SELECT scorekeeper_pin FROM tournament WHERE id = 1').get();
   if (!tournament) return res.status(500).json({ error: 'tournament not initialized' });
 
-  if (pin !== tournament.scorekeeper_pin) {
+  const matchedScorekeeper = pin === tournament.scorekeeper_pin;
+  const matchedAdmin = ADMIN_PIN && pin === ADMIN_PIN;
+  if (!matchedScorekeeper && !matchedAdmin) {
     return res.status(401).json({ error: 'invalid pin' });
   }
 
+  // Admin PIN also grants scorekeeper.
   res.cookie('bbh_pin', tournament.scorekeeper_pin, {
     signed: true,
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 1000 * 60 * 60 * 12,
   });
-  res.json({ ok: true });
+  if (matchedAdmin) {
+    res.cookie('bbh_admin', ADMIN_PIN, {
+      signed: true,
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 1000 * 60 * 60 * 12,
+    });
+  }
+  res.json({ ok: true, isAdmin: !!matchedAdmin });
 });
 
 router.post('/auth/logout', (req, res) => {
   res.clearCookie('bbh_pin');
+  res.clearCookie('bbh_admin');
   res.json({ ok: true });
 });
 
@@ -47,10 +60,10 @@ router.post('/auth/join', (req, res) => {
 });
 
 router.get('/auth/me', (req, res) => {
-  const signed = req.signedCookies?.bbh_pin;
-  const tournament = db.prepare('SELECT scorekeeper_pin FROM tournament WHERE id = 1').get();
-  const isScorekeeper = signed && tournament && signed === tournament.scorekeeper_pin;
-  res.json({ isScorekeeper: !!isScorekeeper });
+  res.json({
+    isScorekeeper: isScorekeeper(req),
+    isAdmin: isAdmin(req),
+  });
 });
 
 router.get('/export', (req, res) => {
