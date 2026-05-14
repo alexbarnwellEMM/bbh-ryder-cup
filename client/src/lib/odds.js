@@ -137,6 +137,101 @@ export function formatMoneyline(m) {
   return m > 0 ? `+${m}` : `${m}`;
 }
 
+// Probability that each team takes the cup outright + the tiebreaker chance.
+// Models remaining matches as a random walk over the points differential
+// (A points − B points). Halves don't move the diff (both teams gain ½ × weight).
+// At the end, diff > 0 → A wins, diff < 0 → B wins, diff === 0 → tiebreaker.
+// The 5v5 alt-shot tiebreaker is treated as 50/50 with no model.
+export function computeCupOdds(state) {
+  if (!state || !Array.isArray(state.matches)) return null;
+  const { totals, matches } = state;
+
+  // Work in half-point units so weights are integers (1 → 2, 0.5 → 1).
+  const startDiff = Math.round(((totals?.a || 0) - (totals?.b || 0)) * 2);
+  let dist = new Map();
+  dist.set(startDiff, 1);
+
+  for (const match of matches) {
+    if (match.status === 'final') continue;
+
+    const w = Math.round((match.pointsWeight || 1) * 2);
+
+    let pA;
+    let pB;
+    let pH;
+
+    if (!match.sideA?.length || !match.sideB?.length) {
+      // Lineup not set yet → neutral guess.
+      pA = 0.4;
+      pB = 0.4;
+      pH = 0.2;
+    } else {
+      let odds = null;
+      if (match.status === 'in_progress') {
+        odds = computeOdds(match);
+      }
+      if (!odds && match.suddenDeath && match.computed?.inOvertime) {
+        // In OT — eventually decisive, ~50/50 split, no halves.
+        pA = 0.5;
+        pB = 0.5;
+        pH = 0;
+      } else if (!odds) {
+        odds = computeOdds(match, { preMatch: true });
+        if (odds) {
+          pA = odds.pAWin;
+          pB = odds.pBWin;
+          pH = odds.pHalve;
+        } else {
+          pA = 0.4;
+          pB = 0.4;
+          pH = 0.2;
+        }
+      } else {
+        pA = odds.pAWin;
+        pB = odds.pBWin;
+        pH = odds.pHalve;
+        // Sudden-death matches don't halve in reality.
+        if (match.suddenDeath) {
+          const decisive = pA + pB;
+          if (decisive > 0) {
+            pA = pA / decisive;
+            pB = pB / decisive;
+            pH = 0;
+          }
+        }
+      }
+    }
+
+    const next = new Map();
+    for (const [diff, prob] of dist) {
+      add(next, diff + w, prob * pA);
+      add(next, diff - w, prob * pB);
+      add(next, diff, prob * pH);
+    }
+    dist = next;
+  }
+
+  let pAOutright = 0;
+  let pBOutright = 0;
+  let pTie = 0;
+  for (const [diff, prob] of dist) {
+    if (diff > 0) pAOutright += prob;
+    else if (diff < 0) pBOutright += prob;
+    else pTie += prob;
+  }
+
+  const pAWin = pAOutright + 0.5 * pTie;
+  const pBWin = pBOutright + 0.5 * pTie;
+
+  return {
+    pAWin,
+    pBWin,
+    pTiebreaker: pTie,
+    moneyA: toMoneyline(pAWin),
+    moneyB: toMoneyline(pBWin),
+  };
+}
+
 function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }

@@ -1,6 +1,7 @@
 import TeamScore from '../components/TeamScore.jsx';
 import MatchCard from '../components/MatchCard.jsx';
 import ActivityTicker from '../components/ActivityTicker.jsx';
+import CupOdds from '../components/CupOdds.jsx';
 
 export default function Scoreboard({ state }) {
   const { teams, sessions, totals, tournamentFinal, tieAfterAll, tiebreaker, activity } = state;
@@ -13,6 +14,8 @@ export default function Scoreboard({ state }) {
         matches={state.matches}
         tournamentFinal={tournamentFinal}
       />
+
+      <CupOdds state={state} />
 
       <ActivityTicker activity={activity} teams={teams} />
 
