@@ -14,7 +14,7 @@ export default function BestBallHoleEntry({
   onSubmit,
   disabled,
 }) {
-  const par0 = par ?? parFor(holeNumber);
+  const par0 = par ?? parFor(holeNumber) ?? 4;
   const initial = (player) => existing?.playerScores?.[player.id] ?? par0;
 
   const [scores, setScores] = useState(() => ({

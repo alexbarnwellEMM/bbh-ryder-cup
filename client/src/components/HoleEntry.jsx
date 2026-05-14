@@ -12,7 +12,7 @@ export default function HoleEntry({
   onSubmit,
   disabled,
 }) {
-  const par0 = par ?? parFor(holeNumber);
+  const par0 = par ?? parFor(holeNumber) ?? 4;
   const [a, setA] = useState(existing?.teamAScore ?? par0);
   const [b, setB] = useState(existing?.teamBScore ?? par0);
 

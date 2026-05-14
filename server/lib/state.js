@@ -119,8 +119,13 @@ export function getFullState() {
     const maxHoleIndex = holes.length
       ? Math.max(...holes.map((h) => h.hole_index))
       : -1;
+    // For sudden-death matches in OT, include the next unplayed OT slot so
+    // the scorekeeper UI knows the par/hole number for the upcoming hole.
+    const nextOtSlot = matchSuddenDeath && computed.inOvertime
+      ? computed.holesPlayed + 1
+      : 0;
     const playLength = matchSuddenDeath
-      ? Math.max(9, maxHoleIndex + 1)
+      ? Math.max(9, maxHoleIndex + 1, nextOtSlot)
       : 9;
     const holePlayOrder = m.start_hole
       ? Array.from(
