@@ -68,7 +68,10 @@ function SetupRow({ match, teamA, teamB, isOpen, onToggle }) {
 
   const aOk = aSel.length === match.teamASize;
   const bOk = bSel.length === match.teamBSize;
-  const locked = match.status === 'in_progress' || match.status === 'final';
+  const hasHoles = match.holes.length > 0;
+  // Lineup is editable until any hole has been scored.
+  const locked = hasHoles || match.status === 'final';
+  const canReset = match.status !== 'pending' || hasHoles;
 
   async function save() {
     setErr('');
@@ -102,6 +105,22 @@ function SetupRow({ match, teamA, teamB, isOpen, onToggle }) {
         });
       }
       await api.startMatch(match.id);
+    } catch (e) {
+      setErr(e.message || 'failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resetMatch() {
+    const msg = hasHoles
+      ? `Reset Match ${match.id}? This wipes ALL ${match.holes.length} scored hole(s) and reverts the match to pending. Lineup is kept.`
+      : `Reset Match ${match.id} back to pending?`;
+    if (!window.confirm(msg)) return;
+    setErr('');
+    setBusy(true);
+    try {
+      await api.resetMatch(match.id);
     } catch (e) {
       setErr(e.message || 'failed');
     } finally {
@@ -164,17 +183,35 @@ function SetupRow({ match, teamA, teamB, isOpen, onToggle }) {
 
           {err && <div className="text-flag text-sm">{err}</div>}
 
-          <div className="flex gap-2">
-            <button className="btn flex-1" onClick={save} disabled={busy || locked || !aOk || !bOk}>
-              Save lineup
-            </button>
-            <button
-              className="btn btn-primary flex-1"
-              onClick={start}
-              disabled={busy || locked || !aOk || !bOk}
-            >
-              Start match
-            </button>
+          <div className="flex gap-2 flex-wrap">
+            {match.status === 'pending' && (
+              <>
+                <button className="btn flex-1" onClick={save} disabled={busy || locked || !aOk || !bOk}>
+                  Save lineup
+                </button>
+                <button
+                  className="btn btn-primary flex-1"
+                  onClick={start}
+                  disabled={busy || locked || !aOk || !bOk}
+                >
+                  Start match
+                </button>
+              </>
+            )}
+            {match.status === 'in_progress' && !hasHoles && (
+              <button className="btn flex-1" onClick={save} disabled={busy || !aOk || !bOk}>
+                Save lineup
+              </button>
+            )}
+            {canReset && (
+              <button
+                className="btn btn-flag flex-1"
+                onClick={resetMatch}
+                disabled={busy}
+              >
+                Reset match
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -56,6 +56,30 @@ router.post('/:id/setup', requirePin, (req, res) => {
   res.json({ ok: true });
 });
 
+router.post('/:id/reset', requirePin, (req, res) => {
+  const matchId = Number(req.params.id);
+  const match = db.prepare('SELECT id FROM match WHERE id = ?').get(matchId);
+  if (!match) return res.status(404).json({ error: 'match not found' });
+
+  const tx = db.transaction(() => {
+    // Cascade handles hole_player_score
+    db.prepare('DELETE FROM hole_result WHERE match_id = ?').run(matchId);
+    db.prepare(
+      `UPDATE match
+          SET status = 'pending',
+              closed_on_hole_index = NULL,
+              result = NULL,
+              team_a_points = 0,
+              team_b_points = 0
+        WHERE id = ?`
+    ).run(matchId);
+  });
+  tx();
+
+  broadcast('state', getFullState());
+  res.json({ ok: true });
+});
+
 router.post('/:id/start', requirePin, (req, res) => {
   const matchId = Number(req.params.id);
   const match = db.prepare('SELECT * FROM match WHERE id = ?').get(matchId);

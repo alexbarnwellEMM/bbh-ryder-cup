@@ -26,6 +26,7 @@ export const api = {
 
   setupMatch: (id, body) => request('POST', `/match/${id}/setup`, body),
   startMatch: (id) => request('POST', `/match/${id}/start`),
+  resetMatch: (id) => request('POST', `/match/${id}/reset`),
   scoreHole: (id, body) => request('POST', `/match/${id}/hole`, body),
   undoHole: (id, idx) => request('DELETE', `/match/${id}/hole/${idx}`),
 
