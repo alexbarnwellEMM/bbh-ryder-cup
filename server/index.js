@@ -15,6 +15,7 @@ import tournamentRouter from './routes/tournament.js';
 import matchesRouter from './routes/matches.js';
 import playersRouter from './routes/players.js';
 import betsRouter from './routes/bets.js';
+import adminRouter from './routes/admin.js';
 import tiebreakerRouter from './routes/tiebreaker.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -33,6 +34,7 @@ api.use('/sse', sseRouter);
 api.use('/match', matchesRouter);
 api.use('/player', playersRouter);
 api.use('/bet', betsRouter);
+api.use('/admin', adminRouter);
 api.use('/tiebreaker', tiebreakerRouter);
 api.use('/', tournamentRouter);
 app.use('/api', api);

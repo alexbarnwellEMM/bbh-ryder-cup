@@ -90,6 +90,7 @@ export default function App() {
               <Setup
                 state={state}
                 isScorekeeper={isScorekeeper}
+                isAdmin={isAdmin}
                 onLogin={login}
                 onLogout={logout}
               />

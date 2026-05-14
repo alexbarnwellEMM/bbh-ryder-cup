@@ -42,6 +42,8 @@ export const api = {
   cancelBet: (name, code, matchId) =>
     request('DELETE', '/bet', { name, code, matchId }),
   deleteBettor: (id) => request('DELETE', `/bet/bettor/${id}`),
+
+  factoryReset: () => request('POST', '/admin/factory-reset'),
 };
 
 export const COURSE_PARS = [5, 4, 5, 3, 4, 4, 4, 4, 3];

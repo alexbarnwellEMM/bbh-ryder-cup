@@ -144,17 +144,10 @@ export function ensureHandicapsIfUnset() {
   return { applied: true };
 }
 
-// One-shot: detects whether the DB has been upgraded to the new structure by
-// checking for any match with sudden_death=1. If not, wipes all scoring +
-// bets + bettors + tiebreaker state and reseeds matches/sessions from
-// SESSIONS. After it runs once, sudden_death=1 rows exist and it never fires
-// again.
-export function migrateToNewFormatIfNeeded() {
-  const withSuddenDeath = db
-    .prepare('SELECT COUNT(*) AS c FROM match WHERE sudden_death = 1')
-    .get().c;
-  if (withSuddenDeath > 0) return { migrated: false, reason: 'already up to date' };
-
+// Wipes all scoring, bets, bettors, tiebreaker state, and match/session
+// config; re-seeds matches and sessions. Preserves tournament row, teams,
+// and players (with their handicaps).
+export function factoryReset() {
   const tx = db.transaction(() => {
     db.prepare('DELETE FROM hole_player_score').run();
     db.prepare('DELETE FROM hole_result').run();
@@ -170,6 +163,17 @@ export function migrateToNewFormatIfNeeded() {
     insertSessionsAndMatches();
   });
   tx();
+}
+
+// One-shot startup migration: fires once when the DB hasn't been upgraded
+// to the new sudden_death format. After it runs, sudden_death=1 rows exist
+// and it never fires again.
+export function migrateToNewFormatIfNeeded() {
+  const withSuddenDeath = db
+    .prepare('SELECT COUNT(*) AS c FROM match WHERE sudden_death = 1')
+    .get().c;
+  if (withSuddenDeath > 0) return { migrated: false, reason: 'already up to date' };
+  factoryReset();
   return { migrated: true };
 }
 

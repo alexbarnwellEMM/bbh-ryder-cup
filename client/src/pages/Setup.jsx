@@ -10,12 +10,12 @@ const FORMAT_LABEL = {
   singles: 'Singles',
 };
 
-export default function Setup({ state, isScorekeeper, onLogin, onLogout }) {
+export default function Setup({ state, isScorekeeper, isAdmin, onLogin, onLogout }) {
   if (!isScorekeeper) return <PinGate onLogin={onLogin} />;
-  return <SetupInner state={state} onLogout={onLogout} />;
+  return <SetupInner state={state} isAdmin={isAdmin} onLogout={onLogout} />;
 }
 
-function SetupInner({ state, onLogout }) {
+function SetupInner({ state, isAdmin, onLogout }) {
   const [openId, setOpenId] = useState(null);
   const [a, b] = state.teams;
 
@@ -30,6 +30,8 @@ function SetupInner({ state, onLogout }) {
         </div>
         <button className="btn" onClick={onLogout}>Lock</button>
       </div>
+
+      {isAdmin && <FactoryResetCard />}
 
       <HandicapsCard teams={state.teams} />
 
@@ -261,6 +263,49 @@ function PlayerPicker({ team, limit, selected, onChange, disabled }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function FactoryResetCard() {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [done, setDone] = useState('');
+
+  async function reset() {
+    if (
+      !window.confirm(
+        'Factory reset — wipes ALL scoring, bets, bettors, lineups, and tiebreaker state. Handicaps + teams are kept. Continue?'
+      )
+    )
+      return;
+    if (!window.confirm('Are you sure? This cannot be undone.')) return;
+    setErr('');
+    setDone('');
+    setBusy(true);
+    try {
+      await api.factoryReset();
+      setDone('All data wiped. Fresh start.');
+    } catch (e) {
+      setErr(e.message || 'failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="card border-flag/40 bg-flag/5 p-3 flex items-center justify-between gap-2">
+      <div>
+        <div className="text-sm font-semibold text-flag">Factory reset</div>
+        <div className="text-xs text-ink/70">
+          Admin only. Wipes scoring, bets, bettors, lineups, tiebreaker. Keeps handicaps + teams.
+        </div>
+        {err && <div className="text-flag text-xs mt-1">{err}</div>}
+        {done && <div className="text-fairway text-xs mt-1">{done}</div>}
+      </div>
+      <button className="btn btn-flag whitespace-nowrap" disabled={busy} onClick={reset}>
+        Wipe all
+      </button>
     </div>
   );
 }
