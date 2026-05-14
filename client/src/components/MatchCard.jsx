@@ -39,6 +39,7 @@ export default function MatchCard({ match, teams }) {
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="pill-muted">{FORMAT_LABEL[match.format] || match.format}</span>
           <span className="pill-muted">{match.teamASize}v{match.teamBSize}</span>
+          <span className="pill-muted">{formatWeight(match.pointsWeight)} pt</span>
           {match.startHole && (
             <span className="pill-muted">Hole {match.startHole}</span>
           )}
@@ -459,6 +460,13 @@ function bigStatus(c) {
   const abs = Math.abs(c.lead);
   if (abs === c.remaining && c.remaining > 0) return 'DORMIE';
   return `${abs} UP`;
+}
+
+function formatWeight(w) {
+  const v = w ?? 1;
+  if (v === 0.5) return '½';
+  if (Number.isInteger(v)) return String(v);
+  return v.toFixed(2).replace(/\.?0+$/, '');
 }
 
 function formatResult(r) {

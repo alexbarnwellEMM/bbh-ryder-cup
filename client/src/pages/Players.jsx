@@ -94,6 +94,7 @@ function computeRecords(matches, teams) {
     const aIds = m.sideA.map((p) => p.id);
     const bIds = m.sideB.map((p) => p.id);
 
+    const weight = m.pointsWeight ?? 1;
     const apply = (ids, outcome) => {
       for (const id of ids) {
         const r = records.get(id);
@@ -101,12 +102,12 @@ function computeRecords(matches, teams) {
         r.matches += 1;
         if (outcome === 'win') {
           r.wins += 1;
-          r.points += 1;
+          r.points += weight;
         } else if (outcome === 'loss') {
           r.losses += 1;
         } else {
           r.halves += 1;
-          r.points += 0.5;
+          r.points += weight / 2;
         }
       }
     };

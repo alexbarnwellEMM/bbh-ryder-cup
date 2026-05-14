@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS match (
   result TEXT,
   team_a_points REAL DEFAULT 0,
   team_b_points REAL DEFAULT 0,
+  points_weight REAL NOT NULL DEFAULT 1,
   display_order INTEGER NOT NULL
 );
 

@@ -12,7 +12,8 @@ export function recomputeMatch(matchId) {
     .all(matchId);
 
   const computed = computeMatch(holes);
-  const pts = pointsFor(computed);
+  const weight = match.points_weight ?? 1;
+  const pts = pointsFor(computed, weight);
 
   let status = match.status;
   if (status === 'pending' && holes.length > 0) status = 'in_progress';
@@ -126,6 +127,7 @@ export function getFullState() {
       result: m.result,
       teamAPoints: m.team_a_points,
       teamBPoints: m.team_b_points,
+      pointsWeight: m.points_weight ?? 1,
       displayOrder: m.display_order,
       sideA,
       sideB,

@@ -69,9 +69,9 @@ export function computeMatch(holeResults) {
   };
 }
 
-export function pointsFor(computed) {
+export function pointsFor(computed, weight = 1) {
   if (!computed.final) return { a: 0, b: 0 };
-  if (computed.lead > 0) return { a: 1, b: 0 };
-  if (computed.lead < 0) return { a: 0, b: 1 };
-  return { a: 0.5, b: 0.5 };
+  if (computed.lead > 0) return { a: weight, b: 0 };
+  if (computed.lead < 0) return { a: 0, b: weight };
+  return { a: weight / 2, b: weight / 2 };
 }

@@ -4,7 +4,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { db } from './db.js';
-import { seedIfEmpty, ensureHandicapsIfUnset } from './seed.js';
+import {
+  seedIfEmpty,
+  ensureHandicapsIfUnset,
+  migrateToWeightedFormatIfFresh,
+} from './seed.js';
 import { SESSION_SECRET } from './lib/auth.js';
 import sseRouter from './routes/sse.js';
 import tournamentRouter from './routes/tournament.js';
@@ -17,6 +21,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 seedIfEmpty();
 ensureHandicapsIfUnset();
+const mig = migrateToWeightedFormatIfFresh();
+if (mig.migrated) console.log('Auto-migrated matches to weighted 12-pt format.');
 
 const app = express();
 app.use(express.json());

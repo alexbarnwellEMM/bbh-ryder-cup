@@ -19,6 +19,7 @@ db.exec(schema);
 
 ensureColumn('player', 'handicap', 'REAL NOT NULL DEFAULT 0');
 ensureColumn('bettor', 'code', 'TEXT');
+ensureColumn('match', 'points_weight', 'REAL NOT NULL DEFAULT 1');
 
 // SQLite ALTER TABLE ADD COLUMN can't take an expression default, so add the
 // column without one, then backfill existing rows.
