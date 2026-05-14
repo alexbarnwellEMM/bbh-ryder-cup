@@ -110,11 +110,12 @@ function MatchScoring({ state, match }) {
 
   const nextIndex = useMemo(() => {
     if (match.computed?.isClosed) return null;
-    for (let i = 0; i < 9; i++) {
+    const cap = match.suddenDeath ? 27 : 9;
+    for (let i = 0; i < cap; i++) {
       if (!holesByIndex.has(i)) return i;
     }
     return null;
-  }, [holesByIndex, match.computed]);
+  }, [holesByIndex, match.computed, match.suddenDeath]);
 
   async function submit(payload) {
     setErr('');

@@ -78,8 +78,8 @@ router.post('/:id/hole', requirePin, (req, res) => {
   const matchId = Number(req.params.id);
   const { holeIndex } = req.body || {};
 
-  if (!Number.isInteger(holeIndex) || holeIndex < 0 || holeIndex > 8) {
-    return res.status(400).json({ error: 'holeIndex must be 0-8' });
+  if (!Number.isInteger(holeIndex) || holeIndex < 0) {
+    return res.status(400).json({ error: 'holeIndex must be >= 0' });
   }
 
   const match = db.prepare('SELECT * FROM match WHERE id = ?').get(matchId);
@@ -87,6 +87,12 @@ router.post('/:id/hole', requirePin, (req, res) => {
   if (!match.start_hole) return res.status(400).json({ error: 'match not set up' });
   if (match.status === 'final' || match.status === 'closed') {
     return res.status(409).json({ error: 'match closed' });
+  }
+  if (holeIndex > 8 && !match.sudden_death) {
+    return res.status(400).json({ error: 'holeIndex must be 0-8' });
+  }
+  if (holeIndex > 26) {
+    return res.status(400).json({ error: 'OT cap reached' });
   }
 
   let teamAScore;

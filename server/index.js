@@ -7,7 +7,7 @@ import { db } from './db.js';
 import {
   seedIfEmpty,
   ensureHandicapsIfUnset,
-  migrateToWeightedFormatIfFresh,
+  migrateToNewFormatIfNeeded,
 } from './seed.js';
 import { SESSION_SECRET } from './lib/auth.js';
 import sseRouter from './routes/sse.js';
@@ -21,8 +21,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 seedIfEmpty();
 ensureHandicapsIfUnset();
-const mig = migrateToWeightedFormatIfFresh();
-if (mig.migrated) console.log('Auto-migrated matches to weighted 12-pt format.');
+const mig = migrateToNewFormatIfNeeded();
+if (mig.migrated) console.log('Migrated: wiped scoring/bets, reseeded matches.');
 
 const app = express();
 app.use(express.json());

@@ -1,6 +1,6 @@
 import { db } from '../db.js';
 import { computeMatch, pointsFor } from './matchPlay.js';
-import { holeOrderFromStart, SWEETENS_COVE } from './course.js';
+import { SWEETENS_COVE } from './course.js';
 import { payoutFor } from './odds.js';
 
 export function recomputeMatch(matchId) {
@@ -11,7 +11,8 @@ export function recomputeMatch(matchId) {
     .prepare('SELECT * FROM hole_result WHERE match_id = ? ORDER BY hole_index')
     .all(matchId);
 
-  const computed = computeMatch(holes);
+  const suddenDeath = !!match.sudden_death;
+  const computed = computeMatch(holes, { suddenDeath });
   const weight = match.points_weight ?? 1;
   const pts = pointsFor(computed, weight);
 
@@ -113,8 +114,20 @@ export function getFullState() {
     const sideA = players.filter((p) => p.side === 'A').map(toPlayer);
     const sideB = players.filter((p) => p.side === 'B').map(toPlayer);
     const holes = matchHoles.all(m.id);
-    const computed = computeMatch(holes);
-    const holePlayOrder = m.start_hole ? holeOrderFromStart(m.start_hole) : null;
+    const matchSuddenDeath = !!m.sudden_death;
+    const computed = computeMatch(holes, { suddenDeath: matchSuddenDeath });
+    const maxHoleIndex = holes.length
+      ? Math.max(...holes.map((h) => h.hole_index))
+      : -1;
+    const playLength = matchSuddenDeath
+      ? Math.max(9, maxHoleIndex + 1)
+      : 9;
+    const holePlayOrder = m.start_hole
+      ? Array.from(
+          { length: playLength },
+          (_, i) => ((m.start_hole - 1 + i) % 9) + 1
+        )
+      : null;
     return {
       id: m.id,
       sessionId: m.session_id,
@@ -128,6 +141,7 @@ export function getFullState() {
       teamAPoints: m.team_a_points,
       teamBPoints: m.team_b_points,
       pointsWeight: m.points_weight ?? 1,
+      suddenDeath: matchSuddenDeath,
       displayOrder: m.display_order,
       sideA,
       sideB,

@@ -42,7 +42,7 @@ const SESSIONS = [
     matches: [
       { format: 'scramble', team_a_size: 2, team_b_size: 2, points_weight: 1 },
       { format: 'best_ball', team_a_size: 2, team_b_size: 2, points_weight: 1 },
-      { format: 'singles', team_a_size: 1, team_b_size: 1, points_weight: 0.5 },
+      { format: 'singles', team_a_size: 1, team_b_size: 1, points_weight: 0.5, sudden_death: 1 },
     ],
   },
   {
@@ -50,7 +50,7 @@ const SESSIONS = [
     matches: [
       { format: 'alt_shot', team_a_size: 2, team_b_size: 2, points_weight: 1 },
       { format: 'alt_shot', team_a_size: 2, team_b_size: 2, points_weight: 1 },
-      { format: 'singles', team_a_size: 1, team_b_size: 1, points_weight: 0.5 },
+      { format: 'singles', team_a_size: 1, team_b_size: 1, points_weight: 0.5, sudden_death: 1 },
     ],
   },
   {
@@ -105,8 +105,8 @@ function insertSessionsAndMatches() {
     'INSERT INTO session (name, display_order) VALUES (?, ?)'
   );
   const insertMatch = db.prepare(
-    `INSERT INTO match (session_id, format, team_a_size, team_b_size, points_weight, display_order)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO match (session_id, format, team_a_size, team_b_size, points_weight, sudden_death, display_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
   );
   let order = 0;
   SESSIONS.forEach((session, sIdx) => {
@@ -119,6 +119,7 @@ function insertSessionsAndMatches() {
         m.team_a_size,
         m.team_b_size,
         m.points_weight,
+        m.sudden_death ? 1 : 0,
         order
       );
     }
@@ -143,29 +144,23 @@ export function ensureHandicapsIfUnset() {
   return { applied: true };
 }
 
-// One-shot: if the DB has no scored holes yet, wipe matches/sessions/bets and
-// reseed with the new structure. This runs on startup so a fresh prod DB picks
-// up the new format without a manual migration.
-export function migrateToWeightedFormatIfFresh() {
-  const holeCount = db.prepare('SELECT COUNT(*) AS c FROM hole_result').get().c;
-  if (holeCount > 0) return { migrated: false, reason: 'has scoring data' };
-
-  const matchCount = db.prepare('SELECT COUNT(*) AS c FROM match').get().c;
-  const halfWeightCount = db
-    .prepare('SELECT COUNT(*) AS c FROM match WHERE points_weight = 0.5')
+// One-shot: detects whether the DB has been upgraded to the new structure by
+// checking for any match with sudden_death=1. If not, wipes all scoring +
+// bets + bettors + tiebreaker state and reseeds matches/sessions from
+// SESSIONS. After it runs once, sudden_death=1 rows exist and it never fires
+// again.
+export function migrateToNewFormatIfNeeded() {
+  const withSuddenDeath = db
+    .prepare('SELECT COUNT(*) AS c FROM match WHERE sudden_death = 1')
     .get().c;
-
-  // Already in the new structure: 13 matches, 2 half-weight singles.
-  if (matchCount === EXPECTED_MATCH_COUNT && halfWeightCount === 2) {
-    return { migrated: false, reason: 'already up to date' };
-  }
+  if (withSuddenDeath > 0) return { migrated: false, reason: 'already up to date' };
 
   const tx = db.transaction(() => {
-    // Wipe everything that references match rows.
     db.prepare('DELETE FROM hole_player_score').run();
     db.prepare('DELETE FROM hole_result').run();
     db.prepare('DELETE FROM match_player').run();
     db.prepare('DELETE FROM bet').run();
+    db.prepare('DELETE FROM bettor').run();
     db.prepare('DELETE FROM tiebreaker_hole').run();
     db.prepare(
       "UPDATE tiebreaker SET active = 0, holes = NULL, team_a_total = 0, team_b_total = 0, winner = NULL WHERE id = 1"
@@ -181,9 +176,9 @@ export function migrateToWeightedFormatIfFresh() {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const { seeded } = seedIfEmpty();
   const hcp = ensureHandicapsIfUnset();
-  const mig = migrateToWeightedFormatIfFresh();
+  const mig = migrateToNewFormatIfNeeded();
   console.log(seeded ? 'Seeded.' : 'Already seeded; no changes.');
   if (hcp.applied) console.log('Pre-filled handicaps for existing players.');
-  if (mig.migrated) console.log('Migrated matches to new weighted format.');
+  if (mig.migrated) console.log('Wiped scoring/bets and reseeded matches.');
   else if (mig.reason) console.log(`Migration skipped: ${mig.reason}.`);
 }

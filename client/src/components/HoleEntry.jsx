@@ -25,13 +25,17 @@ export default function HoleEntry({
     onSubmit({ holeIndex, teamAScore: a, teamBScore: b });
   }
 
+  const isOT = holeIndex >= 9;
   return (
-    <div className="card p-3">
-      <div className="flex items-center justify-between text-[11px] uppercase tracking-widest text-stone-500">
+    <div className={`card p-3 ${isOT ? 'border-flag/50' : ''}`}>
+      <div className="flex items-center justify-between text-[11px] uppercase tracking-widest text-ink/55">
         <div>
+          {isOT && (
+            <span className="text-flag font-bold mr-1">OT {holeIndex - 8} ·</span>
+          )}
           Hole {holeNumber} · Par {par0}
         </div>
-        <div className="text-stone-400">play #{holeIndex + 1}</div>
+        <div className="text-ink/40">play #{holeIndex + 1}</div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 mt-2">

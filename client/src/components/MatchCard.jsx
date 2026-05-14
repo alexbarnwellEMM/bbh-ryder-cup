@@ -208,6 +208,16 @@ function ScoreCenter({ match, teams }) {
     );
   }
 
+  if (c.inOvertime) {
+    return (
+      <div className="text-center min-w-[80px]">
+        <div className="text-3xl font-display font-black text-flag leading-none">OT</div>
+        <div className="text-[10px] uppercase tracking-widest text-ink/55 mt-1">
+          next OT {c.holesPlayed - 8}
+        </div>
+      </div>
+    );
+  }
   const leader = c.lead > 0 ? a : c.lead < 0 ? b : null;
   const big = bigStatus(c);
   return (
@@ -228,7 +238,8 @@ function ScoreCenter({ match, teams }) {
 function HoleStrip({ match, teamA, teamB }) {
   if (!match.holePlayOrder || match.holePlayOrder.length === 0) return null;
   const byIndex = new Map(match.holes.map((h) => [h.holeIndex, h]));
-  const order = match.holePlayOrder;
+  const order = match.holePlayOrder.slice(0, 9);
+  const otOrder = match.holePlayOrder.slice(9);
   const isBestBall =
     match.format === 'best_ball' &&
     match.sideA.length === 2 &&
@@ -315,6 +326,54 @@ function HoleStrip({ match, teamA, teamB }) {
           </div>
         </>
       )}
+
+      {otOrder.length > 0 && (
+        <OTStrip
+          otOrder={otOrder}
+          byIndex={byIndex}
+          teamA={teamA}
+          teamB={teamB}
+        />
+      )}
+    </div>
+  );
+}
+
+function OTStrip({ otOrder, byIndex, teamA, teamB }) {
+  return (
+    <div className="mt-2 pt-2 border-t border-dashed border-bunker">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-[10px] uppercase tracking-widest text-flag font-bold">
+          Overtime
+        </span>
+        <span className="flex-1 h-px bg-bunker/60" />
+      </div>
+      <div className="flex items-stretch gap-1 flex-wrap">
+        {otOrder.map((holeNumber, i) => {
+          const idx = 9 + i;
+          const hole = byIndex.get(idx);
+          return (
+            <div key={idx} className="flex flex-col items-center gap-0.5 min-w-[36px]">
+              <div className="text-[10px] uppercase tracking-widest font-semibold text-ink/55">
+                OT {i + 1}
+              </div>
+              <HoleDot
+                holeNumber={holeNumber}
+                hole={hole}
+                teamA={teamA}
+                teamB={teamB}
+              />
+              {hole && (
+                <div className="text-[10px] tabular-nums flex gap-1">
+                  <span style={{ color: teamA.color }}>{hole.teamAScore}</span>
+                  <span className="text-ink/30">·</span>
+                  <span style={{ color: teamB.color }}>{hole.teamBScore}</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
